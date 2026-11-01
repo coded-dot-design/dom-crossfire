@@ -974,3 +974,8 @@ html.bui[data-theme="light"] .cf-ride-head .eyebrow b {
     transition: none;
   }
 }
+/* Eyebrows that wrap (a ride's or an army's source line) read as one line of text, not flex columns. */
+.cf-ride-head .eyebrow,
+.cf-army .eyebrow {
+  display: block;
+}

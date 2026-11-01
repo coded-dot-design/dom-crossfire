@@ -3001,6 +3001,12 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       steps(n: number) {
         for (let k = 0; k < n; k++) world(1 / 60);
       },
+      /** Beat the wave now (tests and screenshots): every foe gone, every site down, nothing left to come. */
+      clear() {
+        for (const f of foes) f.on = false;
+        for (const st of sites) st.hp = 0;
+        G[BUGS_LEFT] = G[FLIES_LEFT] = 0;
+      },
       /** Skip to wave `w` (tests and screenshots): clears the board and starts it. */
       wave(w: number) {
         for (const f of foes) f.on = false;
