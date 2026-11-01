@@ -1,5 +1,5 @@
 // The zero-allocation check for the step (Blitz's, ported). A busy attract match (both rides AI,
-// every army on the board: the crossfire wave, then the loop) is warmed up, then 20,000 fixed steps
+// every army on the board: the finale, again and again) is warmed up, then 20,000 fixed steps
 // run with no read or render (world.steps) while V8's minor GCs are counted. Two seeds, both rides.
 // A board match with you idle on the crossfire wave runs too (your controls are read, never allocate).
 // Needs npm run check.
@@ -28,8 +28,8 @@ test("a busy match steps without allocating (minor GC ≤ 1 in 20 000 steps)", a
         g.engine.stop(); // step by hand
         if (board) g.start(), g.world.steps(200);
         g.world.steps(6000); // warm up: the JIT, every pool, strikes, crates, the waves turning over
-        g.world.wave(5); // then the crossfire wave: every army on the board
-        g.world.steps(900);
+        g.world.wave(17); // then the finale: every army on the board
+        g.world.steps(300);
         return g.world.foes.filter((f) => f.on).length + g.world.sites.filter((s) => s.on).length;
       }, [seed, ride, board]);
       assert.ok(busy >= 3, `the match is busy (${busy} foes and sites)`);

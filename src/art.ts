@@ -274,7 +274,67 @@ export function factionSvg(k: number): string {
   if (k === 0) return bugSvg(3);
   if (k === 1) return alienSvg(2);
   if (k === 2) return tankSvg("#ff8a1f");
-  if (k === 3) return flySvg(1);
+  if (k === 3) return frogSvg();
   const cell = (i: number, x: number, y: number) => factionSvg(i).replace("<svg ", `<svg x="${x}" y="${y}" width="46" height="46" `);
   return `<svg viewBox="0 0 100 100" aria-hidden="true">${cell(0, 2, 2) + cell(1, 52, 2) + cell(2, 2, 52) + cell(3, 52, 52)}</svg>`;
+}
+
+// ---------- The frog (Byte Runner): a 24 × 24 stepped disc, side eyes, tiny ball feet ----------
+// Byte Runner's own pixel geometry; here it's a bad guy, so it's drawn as it is, mouth and all.
+const FROG = { body: "#3ecb74", fat: "#8de45c", eye: "#fff5d7", pupil: "#152820" };
+const FROG_EYES = { stems: "M7 0h5v2h2v5H7V2H6V1h1ZM16 0h5v2h2v5h-7Z", cream: "M9 1h5v2h-2v3h2v1H9V6H8V2h1ZM18 1h5v2h-2v3h2v1h-5V6h-1V2h1Z", pupils: "M12 2h2v4h-2ZM21 2h2v4h-2Z" };
+const footD = (x: number, y: number) => `M${x + 1} ${y}h3v1h1v3h-1v1h-3v-1h-1v-3h1Z`;
+const FROG_FEET = [footD(3, 23) + footD(16, 23), footD(2, 22) + footD(17, 24)];
+/** The frog's body cells (Byte Runner's mask): mouth 0 shut, 2 wide open, cut into the facing side. */
+function frogCells(mouth: number) {
+  const cells: [number, number][] = [], slope = mouth === 2 ? 0.95 : mouth === 1 ? 0.48 : 0;
+  for (let y = 0; y < 24; y++)
+    for (let x = 0; x < 24; x++) {
+      const dx = x - 11.5, dy = y - 11.5;
+      if (dx * dx + dy * dy > 144) continue;
+      const fwd = x - 11.5, across = Math.abs(y + 3 - 14.5);
+      if (slope && fwd > 0 && across <= Math.max(0.5, fwd * slope)) continue;
+      cells.push([x, y + 3]);
+    }
+  return cells;
+}
+/** The frog, facing right (or left), mouth shut or open, fat (it has eaten) or not. */
+export function frogSprites(doc: Document) {
+  const cache = new Map<number, HTMLCanvasElement>();
+  return (ctx: Ctx, x: number, y: number, left: boolean, mouth: number, fat: boolean, flash: boolean, frame: number, scale = 1) => {
+    const key = mouth * 8 + +fat * 4 + +flash * 2 + frame;
+    let tile = cache.get(key);
+    if (!tile) {
+      tile = doc.createElement("canvas");
+      tile.width = 30;
+      tile.height = 32;
+      const c = tile.getContext("2d")!, body = flash ? "#ffffff" : fat ? FROG.fat : FROG.body;
+      c.translate(2, 1);
+      // A dark rim so it reads on a light board too.
+      c.fillStyle = "#07060f";
+      for (const [cx, cy] of frogCells(mouth)) c.fillRect(cx - 1, cy - 1, 3, 3);
+      c.fillStyle = body;
+      c.fill(new Path2D(FROG_FEET[frame]!));
+      for (const [cx, cy] of frogCells(mouth)) c.fillRect(cx, cy, 1, 1);
+      c.fill(new Path2D(FROG_EYES.stems));
+      c.fillStyle = FROG.eye;
+      c.fill(new Path2D(FROG_EYES.cream));
+      c.fillStyle = FROG.pupil;
+      c.fill(new Path2D(FROG_EYES.pupils));
+      if (mouth) (c.fillStyle = "#ff5c8f"), c.fillRect(17, 14, 6, 2);
+      cache.set(key, tile);
+    }
+    ctx.save();
+    ctx.translate(Math.round(x), Math.round(y));
+    ctx.scale(left ? -scale : scale, scale);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(tile, -15, -17);
+    ctx.restore();
+  };
+}
+/** The frog as an SVG (mouth half open). */
+export function frogSvg() {
+  const out: [number, number, string][] = frogCells(1).map(([x, y]) => [x, y, FROG.body]);
+  const p = (d: string, f: string) => `<path d="${d}" fill="${f}"/>`;
+  return `<svg viewBox="-1 -1 26 30" aria-hidden="true" shape-rendering="crispEdges">${rects(out) + p(FROG_FEET[0]!, FROG.body) + p(FROG_EYES.stems, FROG.body) + p(FROG_EYES.cream, FROG.eye) + p(FROG_EYES.pupils, FROG.pupil)}</svg>`;
 }

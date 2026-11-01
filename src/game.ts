@@ -5,14 +5,16 @@
  *   1 SWARM PROTOCOL  bugs that eat the board's letters and grow (6 letters, then 12: a hunter)
  *   2 NULL INVADERS   button factories that keep releasing aliens until you break them
  *   3 SHERMAN BYTES   enemy tank squads holding fortified button bases (four walls, a core)
- *   4 BYTE RUNNER     flies that race the food pipes; a power square turns them blue (eat them)
- *   5 CROSSFIRE       all four at once
+ *   4 BYTE RUNNER     flies and the frog eat the pellets on the board's blocks and grow; a big
+ *                     frog's tongue eats a plane or a tank whole
+ * Each army is a section of four waves (more, faster, tougher, a mini-boss on the fourth), then
+ * the finale: all four at once.
  * The plane is fast and flies over cover: its guns shred the air and the factories, but barely
  * scratch armour or walls. The tank is slow and tough: its cannon breaches walls and wrecks tanks,
  * and its treads squash small bugs. Co-op is the point: each one covers what the other can't.
  *
  * Two modes, as in Blitz:
- *   board - its own page: a grid arena, five waves, shared reinforcements (DROPS), a result.
+ *   board - its own page: a grid arena, four sections of four waves and the finale, shared reinforcements (DROPS), a result.
  *   embed - dropped onto any page: the page is the arena, shells knock its headings about, the
  *           waves loop. Escape (or the toggle) closes it and the page is untouched.
  *
@@ -26,7 +28,7 @@ import { sound } from "../vendor/fizlet/sound";
 import { inRect } from "../vendor/fizlet/collide";
 import { launch, slam } from "../vendor/fizlet/ui/board-ui";
 import { drops } from "../vendor/fizlet/rules";
-import { tankSprites, shipSprites, alienSprites, flySprites, bugSprites, shipSvg, tankSvg, factionSvg } from "./art";
+import { tankSprites, shipSprites, alienSprites, flySprites, bugSprites, frogSprites, shipSvg, tankSvg, factionSvg } from "./art";
 
 /** The Board UI kit CSS (Fizlet's ui brick), minified and baked in by scripts/build.mjs. */
 declare const __KIT_CSS__: string;
@@ -41,7 +43,7 @@ export interface CrossfireOptions {
   demo?: boolean;
   /** Seed for the match's randomness (engine.random). Same seed + same input = the same match. */
   seed?: number;
-  /** Waves to win a board match. Default 5. */
+  /** Waves to win a board match. Default 17 (four sections of four, then the finale). */
   waves?: number;
   /** Called when a board match ends. */
   onEnd?: (r: CrossfireResult) => void;
@@ -73,8 +75,8 @@ const RIDE_NAME = ["TANK", "PLANE"];
 const RIDE_COLOR = ["#39ffb0", "#19f0ff"];
 const MAXHP = [6, 4], RAIL_MAX = 9, STRIKE_MAX = 5;
 // Foes. Air foes (aliens, flies) fly; ground foes (bugs, tanks) don't.
-const BUG = 1, ALIEN = 2, ETANK = 3, FLY = 4;
-const FOE_NAME = ["", "BUG", "ALIEN", "TANK", "FLY"];
+const BUG = 1, ALIEN = 2, ETANK = 3, FLY = 4, FROG = 5;
+const FOE_NAME = ["", "BUG", "ALIEN", "TANK", "FLY", "FROG"];
 const ETANK_COLOR = "#ff8a1f";
 // Sites: Null Invaders' button factories and Sherman Bytes' fortified button bases.
 const FACTORY = 1, BASE = 2;
@@ -90,8 +92,8 @@ const H_FACTORY = 4, H_CORE = 5, H_WALL = 6;
 const RAPID = 1, TRIPLE = 2, STRIKE = 3, SHIELD = 4, MINE = 5, HEAL = 6, AMMO = 7;
 const TILE_COLOR = ["", "#39ffb0", "#19f0ff", "#ff2e88", "#f6f3ff", "#ff2b4e", "#a8ff3e", "#ffc21a"];
 const COLORS = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a", "#b48cff", "#ff8a1f", "#a8ff3e", "#f6f3ff"];
-const WORDS = ["BOOM", "KABOOM", "WRECKED", "DIRECT HIT", "BLAM", "SQUASHED", "AIRSTRIKE!", "RAPID", "TRIPLE", "SHIELD", "+1 STRIKE", "MINE!", "+2 HP", "+1 LONG", "SNIPED", "SUPPLY DROP", "CARPET BOMB", "OVERHEAT", "LOCKED", "MEDKIT", "+2 LONG", "JACKPOT", "BREACH!", "BASE TAKEN", "FACTORY DOWN", "POWER!", "+100", "+200", "+300", "+400", "GROWN", "HUNTER", "TWIN", "TRIDENT", "OVERDRIVE", "+1 HP", "CHOMP", "WAVE CLEAR", "REPAIR"];
-const W_BOOM = 0, W_SQUASH = 5, W_STRIKE = 6, W_MINE = 11, W_SNIPED = 14, W_SUPPLY = 15, W_CARPET = 16, W_HOT = 17, W_LOCK = 18, W_BREACH = 22, W_TAKEN = 23, W_FACTORY = 24, W_POWER = 25, W_EAT = 26, W_GROWN = 30, W_HUNTER = 31, W_TIER = 30, W_HP1 = 35, W_CHOMP = 36, W_CLEAR = 37, W_REPAIR = 38;
+const WORDS = ["BOOM", "KABOOM", "WRECKED", "DIRECT HIT", "BLAM", "SQUASHED", "AIRSTRIKE!", "RAPID", "TRIPLE", "SHIELD", "+1 STRIKE", "MINE!", "+2 HP", "+1 LONG", "SNIPED", "SUPPLY DROP", "CARPET BOMB", "OVERHEAT", "LOCKED", "MEDKIT", "+2 LONG", "JACKPOT", "BREACH!", "BASE TAKEN", "FACTORY DOWN", "POWER!", "+100", "+200", "+300", "+400", "GROWN", "HUNTER", "TWIN", "TRIDENT", "OVERDRIVE", "+1 HP", "CHOMP", "WAVE CLEAR", "REPAIR", "EATEN!", "GULP", "BOSS DOWN"];
+const W_BOOM = 0, W_SQUASH = 5, W_STRIKE = 6, W_MINE = 11, W_SNIPED = 14, W_SUPPLY = 15, W_CARPET = 16, W_HOT = 17, W_LOCK = 18, W_BREACH = 22, W_TAKEN = 23, W_FACTORY = 24, W_POWER = 25, W_EAT = 26, W_GROWN = 30, W_HUNTER = 31, W_TIER = 30, W_HP1 = 35, W_CHOMP = 36, W_CLEAR = 37, W_REPAIR = 38, W_EATEN = 39, W_GULP = 40, W_BOSS = 41;
 const TILE_WORD = [0, 7, 8, 10, 9, 11, 12, 13];
 const CRATE_WORD = [19, 20, 10, 21];
 const FX_COLORS = ["#fff4ff", "#ffc21a", "#ff8a1f", "#ff2e88", "#19f0ff", "#39ffb0", "#9a63ff", "#07060f", "#a8ff3e", "#b48cff"];
@@ -99,23 +101,17 @@ const STREAK = ["", "", "", "+1 LONG SHOT", "", "+1 AIRSTRIKE", "", "", "CARPET 
 const TIER_NAME = ["", "PULSE", "TWIN", "TRIDENT", "OVERDRIVE"];
 // Null Invaders' weapon tiers: XP to unlock, and the cadence (160 ms → 95 ms).
 const TIER_XP = [0, 0, 12, 40, 90], TIER_COOL = [0, 0.16, 0.14, 0.12, 0.095];
-// The waves: name, colour, what happens, the plane's job, the tank's job.
+// The sections: name, colour, what happens, the plane's job, the tank's job, the fourth wave's mini-boss.
 export const FACTIONS = [
-  ["SWARM PROTOCOL", "#b48cff", "Bugs eat the letters and grow. Twelve letters and they hunt you.", "PICK THEM OFF FROM THE AIR", "SQUASH THE SMALL ONES"],
-  ["NULL INVADERS", "#19f0ff", "Every button is a factory. Break it or the aliens never stop.", "BREAK THE FACTORIES", "COVER THE PLANE"],
-  ["SHERMAN BYTES", "#ffc21a", "Squads hold fortified button bases. Breach the walls, take the button.", "CLEAR THE SKY, STRAFE THE SQUADS", "BREACH THE WALLS"],
-  ["BYTE RUNNER", "#a8ff3e", "Flies race the food pipes. Grab a pink power square, then eat them.", "CATCH THE FAST ONES", "GRAB THE POWER SQUARES"],
-  ["CROSSFIRE", "#ff2e88", "All four at once. Stick together.", "AIR AND FACTORIES", "WALLS AND GROUND"],
+  ["SWARM PROTOCOL", "#b48cff", "Bugs eat the letters and grow. Twelve letters and they hunt you.", "PICK THEM OFF FROM THE AIR", "SQUASH THE SMALL ONES", "THE QUEEN"],
+  ["NULL INVADERS", "#19f0ff", "Every button is a factory. Break it or the aliens never stop.", "BREAK THE FACTORIES", "COVER THE PLANE", "THE MOTHERSHIP"],
+  ["SHERMAN BYTES", "#ffc21a", "Squads hold fortified button bases. Breach the walls, take the button.", "CLEAR THE SKY, STRAFE THE SQUADS", "BREACH THE WALLS", "THE HEAVY"],
+  ["BYTE RUNNER", "#a8ff3e", "The pellets on the blocks are theirs: every one eaten makes them stronger. A big frog eats rides.", "KILL THEM BEFORE THEY EAT", "WATCH THE FROG'S TONGUE", "THE BIG FROG"],
+  ["CROSSFIRE", "#ff2e88", "All four at once. Stick together.", "AIR AND FACTORIES", "WALLS AND GROUND", ""],
 ] as const;
 const SHORT = ["SWARM", "INVADERS", "SHERMAN", "BYTE RUN", "CROSSFIRE"];
-// Per wave: bugs, factories, bases, pipes, flies (scaled to the board's size; the loop grows them).
-const PLAN = [
-  [40, 0, 0, 0, 0],
-  [0, 3, 0, 0, 0],
-  [0, 0, 2, 0, 0],
-  [0, 0, 0, 3, 16],
-  [16, 1, 1, 1, 8],
-];
+// Four sections of four waves, then the finale (wave 17).
+const PER = 4, FINALE = 17;
 // The board's copy: the four games' taglines, for the bugs to eat.
 const COPY = ["PROTECT EVERY LAST BYTE", "DELETE THE INVASION", "EVERY PAGE IS A BATTLEFIELD", "FOLLOW THE BITES", "EAT THE PAGE", "THE VIRUS SCRAMBLED THE CARTRIDGES"];
 
@@ -132,7 +128,7 @@ interface Unit {
 interface Foe {
   on: boolean; kind: number; sub: number; x: number; y: number; a: number; ta: number; vx: number; vy: number;
   hp: number; max: number; t: number; think: number; gx: number; gy: number; flash: number; eaten: number;
-  tier: number; home: number; mode: number; cool: number; tread: number; recoil: number; food: number; pipe: number; u: number; dir: number;
+  tier: number; home: number; mode: number; cool: number; tread: number; recoil: number; food: number; u: number; boss: number;
 }
 interface Site { on: boolean; kind: number; x: number; y: number; w: number; h: number; hp: number; max: number; t: number; label: number; won: boolean; flash: number; cool: number; out: number }
 interface Shell { x: number; y: number; vx: number; vy: number; life: number; owner: number; on: boolean; rail: boolean; tgt: number; foe: boolean; kind: number }
@@ -340,18 +336,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     fxLen = 0;
   }
   const sfx = sound(e, { cues: { shot: "fire", bolt: "click", boom: "boom", hit: "hit", power: "power", strike: "hurt", land: "click", lock: "click", win: "win", end: "end", ready: "ready", streak: "win", wave: "ready", chomp: "click" } });
-  const drawTank = tankSprites(document), drawShip = shipSprites(document), drawAlien = alienSprites(document), drawFly = flySprites(document), drawBug = bugSprites(document);
+  const drawTank = tankSprites(document), drawShip = shipSprites(document), drawAlien = alienSprites(document), drawFly = flySprites(document), drawBug = bugSprites(document), drawFrog = frogSprites(document);
   const R = e.random;
   // The screen's own random (the shake): seeded off the match's seed, drawn only by render.
   const shakeSeed = new Uint32Array([(R.state ^ 0x9e3779b9) >>> 0]);
   const shakeRandom = () => ((shakeSeed[0] = Math.imul(shakeSeed[0]!, 1664525) + 1013904223), shakeSeed[0]! / 4294967296);
   // The match's running numbers, stored in place (a double in a closure variable is a new heap number per write).
   const G = new Float64Array(24);
-  const CNT = 0, MATCH = 1, TILE_IN = 2, CRATE_IN = 3, QUAKE = 4, WAVE = 5, PHASE = 6, PH_T = 7, SCORE = 8, DROPS = 9, POWER = 10, CHAIN = 11;
+  const CNT = 0, MATCH = 1, TILE_IN = 2, CRATE_IN = 3, QUAKE = 4, WAVE = 5, PHASE = 6, PH_T = 7, SCORE = 8, DROPS = 9, LVL = 10, FROGS_LEFT = 11;
   const BUGS_LEFT = 12, BUG_IN = 13, FLIES_LEFT = 14, FLY_IN = 15, RES = 16, KILLS = 17, WAVE_T = 18, OUT_T = 19, PLAYED = 20, DTS = 21;
   // Phases of a wave: its card (no spawns), the fight, cleared (a beat, then the next card).
   const P_CARD = 0, P_FIGHT = 1, P_CLEAR = 2;
-  const RESUME = 3, WAVES = o.waves ?? 5;
+  const RESUME = 3, WAVES = o.waves ?? FINALE;
   G[DROPS] = 4;
   const coarse = matchMedia("(pointer: coarse)"), fine = matchMedia("(pointer: fine)"), phone = matchMedia(PHONE);
   const calm = matchMedia("(prefers-reduced-motion: reduce)");
@@ -383,7 +379,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   }
   cast();
   const MAXF = 80;
-  const foes: Foe[] = Array.from({ length: MAXF }, () => dbl({ on: false, kind: 0, sub: 0, x: 0, y: 0, a: 0, ta: 0, vx: 0, vy: 0, hp: 0, max: 1, t: 0, think: 0, gx: 0, gy: 0, flash: 0, eaten: 0, tier: 1, home: -1, mode: 0, cool: 0, tread: 0, recoil: 0, food: -1, pipe: -1, u: 0, dir: 1 }, "x y a ta vx vy hp max t think gx gy flash cool tread recoil u"));
+  const foes: Foe[] = Array.from({ length: MAXF }, () => dbl({ on: false, kind: 0, sub: 0, x: 0, y: 0, a: 0, ta: 0, vx: 0, vy: 0, hp: 0, max: 1, t: 0, think: 0, gx: 0, gy: 0, flash: 0, eaten: 0, tier: 1, home: -1, mode: 0, cool: 0, tread: 0, recoil: 0, food: -1, u: 0, boss: 0 }, "x y a ta vx vy hp max t think gx gy flash cool tread recoil u"));
   const SITES = 6;
   const sites: Site[] = Array.from({ length: SITES }, () => dbl({ on: false, kind: 0, x: 0, y: 0, w: 0, h: 0, hp: 0, max: 1, t: 0, label: 0, won: false, flash: 0, cool: 0, out: 0 }, "x y w h hp max t flash cool"));
   const shells: Shell[] = Array.from({ length: 200 }, () => dbl({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1, foe: false, kind: 0 }, "x y vx vy life"));
@@ -399,12 +395,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const GCAP = 200;
   const gx = new Float64Array(GCAP), gy = new Float64Array(GCAP), gch = new Uint16Array(GCAP), gate = new Uint8Array(GCAP), gres = new Int16Array(GCAP).fill(-1);
   let glyphs = 0;
-  // Byte Runner's food pipes: up to 4 pipes, each a path of up to 4 corners (x, y), along grid lines;
-  // pellets ride them; a few are power squares.
-  const PIPES = 4, PCAP = 260;
-  const pipeX = new Float64Array(PIPES * 4), pipeY = new Float64Array(PIPES * 4), pipeN = new Uint8Array(PIPES), pipeLen = new Float64Array(PIPES);
-  let pipes = 0;
-  const pelX = new Float64Array(PCAP), pelY = new Float64Array(PCAP), pelOn = new Uint8Array(PCAP), pelPow = new Uint8Array(PCAP), pelBack = new Float64Array(PCAP);
+  // Byte Runner's pellets: food for its flies and its frog, set on the board's blocks.
+  const PCAP = 32;
+  const pelX = new Float64Array(PCAP), pelY = new Float64Array(PCAP), pelOn = new Uint8Array(PCAP), pelBack = new Float64Array(PCAP);
   let pellets = 0;
   const CRATE_FALL = 170, CRATE_DROP = 2.2;
   const supply = drops(e, { kinds: ["repair", "long", "strike", "jackpot"], cap: 2, life: 14 + CRATE_DROP, fall: CRATE_FALL, speed: CRATE_FALL / CRATE_DROP });
@@ -593,6 +586,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function weightF(u: Unit, k: number) {
     const kd = k >= MAXF ? 4 + sites[k - MAXF]!.kind : foes[k]!.kind;
     if (u.you) F[WT] = 1;
+    else if (kd === FROG) F[WT] = 0.5;
     else if (u.kind === PLANE) F[WT] = kd === 4 + FACTORY ? 0.55 : kd === 4 + BASE ? 2.4 : kd === ALIEN || kd === FLY ? 0.6 : kd === ETANK ? 1.8 : 0.9;
     else F[WT] = kd === 4 + BASE ? 0.5 : kd === 4 + FACTORY ? 1.3 : kd === ETANK ? 0.55 : kd === BUG ? (foes[k]!.tier >= 3 ? 0.6 : 0.85) : 1.3;
   }
@@ -602,7 +596,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     for (let i = 0; i < MAXF; i++) {
       const f = foes[i]!;
       if (!f.on) continue;
-      if (f.kind === FLY && G[POWER]! > 0 && u.you) continue; // blue flies are to eat, not shoot
       F[HX] = f.x - x;
       F[HY] = f.y - y;
       hyp();
@@ -789,8 +782,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     f.on = false;
     if (f.food >= 0 && gres[f.food] === foes.indexOf(f)) gres[f.food] = -1;
     const k = f.kind;
-    if (k === ETANK) {
-      ((FQ[0] = f.x), (FQ[1] = f.y), (FQ[2] = 2), (FQ[3] = 3), boomQ());
+    if (f.boss) ((FQ[0] = f.x), (FQ[1] = f.y - 40), (FQ[2] = W_BOSS), (FQ[3] = 3), (FQ[4] = 24), fxPush(FX_WORD)), (G[QUAKE] = Math.min(18, G[QUAKE]! + 8));
+    if (k === ETANK || k === FROG || f.boss) {
+      ((FQ[0] = f.x), (FQ[1] = f.y), (FQ[2] = f.boss ? 3 : 2), (FQ[3] = 3), boomQ());
       debris(f.x, f.y, 8, 2, 150);
       ((FQ[0] = f.x), (FQ[1] = f.y - 18), (FQ[2] = (R() * 5) | 0), (FQ[3] = 3), (FQ[4] = 18), fxPush(FX_WORD));
       e.events.emit("boom", -1);
@@ -799,7 +793,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       debris(f.x, f.y, 5, k === FLY ? 8 : k === ALIEN ? 4 : 9, 120);
       e.events.emit("hit", -1);
     }
-    credit(by, k === BUG ? 10 * f.tier : k === ALIEN ? 20 + 10 * f.sub : k === ETANK ? 60 : 40, k === ALIEN ? 4 : k === FLY ? 3 : k === ETANK ? 2 : 1, f.x, f.y);
+    credit(by, (k === BUG ? 10 * f.tier : k === ALIEN ? 20 + 10 * f.sub : k === ETANK ? 60 : k === FROG ? 200 + 50 * f.tier : 30 + 15 * f.tier) * (f.boss ? 4 : 1), k === ALIEN ? 4 : k === FLY ? 3 : k === FROG ? 8 : k === ETANK ? 2 : 1, f.x, f.y);
     if (by >= 0) (feedK[feedN % 8] = by), (feedV[feedN % 8] = k), feedN++;
   }
   /** Site s takes damage. A factory breaks (no more aliens); a base's core falls and the base is yours. */
@@ -824,7 +818,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function hitTarget(k: number, by: number, kind: number) {
     const ridek = crew[by]!.kind, row = HURT[ridek]!;
     if (k < MAXF) {
-      const f = foes[k]!, col = f.kind === BUG ? 0 : f.kind === ALIEN ? 1 : f.kind === ETANK ? 2 : 3;
+      const f = foes[k]!, col = f.kind === BUG || f.kind === FROG ? 0 : f.kind === ALIEN ? 1 : f.kind === ETANK ? 2 : 3;
       ((F[AMT] = kind === K_RAIL ? (ridek === TANK ? 6 : 3) : row[col]!), hurtFoe(f, by));
     } else {
       const s = sites[k - MAXF]!;
@@ -1014,13 +1008,14 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   }
 
   // ---------- The waves ----------
-  /** How many of PLAN column c this wave brings (scaled to the board; every loop of five grows it). */
-  function count(c: number) {
-    const w = G[WAVE]! - 1, base = PLAN[w % 5]![c]!, loop = Math.floor(w / 5);
-    if (!base) return 0;
-    const sized = c === 1 || c === 2 || c === 3 ? Math.max(1, Math.round(base * Math.min(1, area + 0.15))) + loop : Math.max(2, Math.round(base * area * (1 + loop * 0.35)));
-    return Math.min(c === 3 ? PIPES : c === 1 ? 4 : c === 2 ? 2 : 60, sized);
-  }
+  /** The wave's place: its section (0-3 the armies, 4 the finale), its step in the section (0-3),
+   *  and how many times the whole run has looped (the drop-in and the attract match go on). */
+  const wave = () => (demo ? FINALE : ((Math.max(1, G[WAVE]!) - 1) % FINALE) + 1);
+  const section = () => (wave() >= FINALE ? 4 : (wave() - 1) >> 2);
+  const step = () => (wave() >= FINALE ? 3 : (wave() - 1) & 3);
+  const loops = () => Math.floor((Math.max(1, G[WAVE]!) - 1) / FINALE);
+  /** n foes for this board (a bigger board gets more), a loop more again. */
+  const sized = (n: number) => Math.max(2, Math.round(n * area * (1 + loops() * 0.35)));
   /** A free spot for a w × h site: off cover, off other sites, away from your rides (F[AX], F[AY]). */
   function siteSpot(w: number, h: number, top: boolean) {
     for (let k = 0; k < 40; k++) {
@@ -1054,7 +1049,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     s.y = F[AY]!;
     s.w = w;
     s.h = h;
-    s.max = s.hp = kind === FACTORY ? 50 : 28;
+    s.max = s.hp = (kind === FACTORY ? 50 + 12 * step() : 28 + 6 * step()) * (1 + loops() * 0.5);
     s.t = 1 + R() * 1.5;
     s.cool = 1.5;
     s.label = (G[WAVE]! * 3 + idx) % LABELS.length;
@@ -1076,71 +1071,82 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       }
     }
   }
-  /** Byte Runner's food pipes: right-angled paths along the grid, pellets every half square, power squares. */
-  function layPipes(n: number) {
-    pipes = 0;
-    pellets = 0;
-    const snap = (v: number) => Math.round(v / T) * T;
-    for (let p = 0; p < n; p++) {
-      const k = p * 4, band = (H - 160) / n, y0 = snap(110 + band * p + R() * band * 0.5), y1 = snap(110 + band * p + band * 0.4 + R() * band * 0.5);
-      const x0 = snap(T + R() * W * 0.18), x1 = snap(W - T - R() * W * 0.18), xm = snap(W * (0.3 + R() * 0.4));
-      // A Z along the grid lines: across, down (or up), across.
-      pipeX[k] = x0, pipeY[k] = y0, pipeX[k + 1] = xm, pipeY[k + 1] = y0, pipeX[k + 2] = xm, pipeY[k + 2] = y1, pipeX[k + 3] = x1, pipeY[k + 3] = y1;
-      pipeN[p] = 4;
-      let len = 0;
-      for (let j = 0; j < 3; j++) {
-        const sx = pipeX[k + j]!, sy = pipeY[k + j]!, ex = pipeX[k + j + 1]!, ey = pipeY[k + j + 1]!, l = Math.abs(ex - sx) + Math.abs(ey - sy);
-        for (let d = j ? T / 2 : 0; d <= l && pellets < PCAP; d += T / 2) {
-          pelX[pellets] = sx + Math.sign(ex - sx) * d;
-          pelY[pellets] = sy + Math.sign(ey - sy) * d;
-          pelOn[pellets] = 1;
-          pelPow[pellets] = 0;
-          pelBack[pellets] = 0;
-          pellets++;
-        }
-        len += l;
-      }
-      pipeLen[p] = len;
-      pipes++;
+  /** Put pellet p on a block that has none (Byte Runner: the food sits on the board's blocks), or on
+   *  open ground when there are no blocks (the drop-in's page). */
+  function placePellet(p: number) {
+    for (let k = 0; k < 16; k++) {
+      let x = 0, y = 0;
+      if (coverN && k < 12) {
+        const b = blocks[Math.floor(R() * coverN)]!;
+        if (b.hp <= 0) continue;
+        (x = b.x + b.w / 2), (y = b.y + b.h / 2);
+      } else (x = 60 + R() * (W - 120)), (y = 100 + R() * (H - 160));
+      let taken = false;
+      for (let q = 0; q < pellets && !taken; q++) if (q !== p && pelOn[q] && Math.abs(pelX[q]! - x) < 8 && Math.abs(pelY[q]! - y) < 8) taken = true;
+      if (taken) continue;
+      pelX[p] = x;
+      pelY[p] = y;
+      pelOn[p] = 1;
+      return;
     }
-    // Pink power squares, a few along the pipes (Byte Runner: they turn the flies blue).
-    for (let k = 0; k < Math.min(6, 2 + n) && pellets > 8; k++) pelPow[4 + Math.floor(R() * (pellets - 8))] = 1;
   }
-  /** A point F[PU] px along pipe p, into F[QX], F[QY]. */
-  function onPipe(p: number) {
-    let d = F[PU]!;
-    const k = p * 4;
-    for (let j = 0; j < 3; j++) {
-      const sx = pipeX[k + j]!, sy = pipeY[k + j]!, ex = pipeX[k + j + 1]!, ey = pipeY[k + j + 1]!, l = Math.abs(ex - sx) + Math.abs(ey - sy);
-      if (d <= l || j === 2) {
-        const t = l ? Math.min(1, Math.max(0, d / l)) : 0;
-        F[QX] = sx + (ex - sx) * t;
-        F[QY] = sy + (ey - sy) * t;
-        return;
-      }
-      d -= l;
+  /** Pellet p is eaten: it comes back on another block a few seconds later. */
+  function eatPellet(p: number) {
+    pelOn[p] = 0;
+    pelBack[p] = 5 + R() * 4;
+    ((FQ[0] = 2), (FQ[1] = pelX[p]!), (FQ[2] = pelY[p]!), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 14), (FQ[6] = 0.35), (FQ[7] = 8), fxPush(FX_SPAWN));
+    e.events.emit("chomp", -1);
+  }
+  /** The nearest pellet to foe f within `range`, into F[QX], F[QY]; its index or -1. */
+  function nearestPellet(f: Foe, range: number) {
+    let best = -1, bd = range * range;
+    for (let p = 0; p < pellets; p++) {
+      if (!pelOn[p]) continue;
+      const dx = pelX[p]! - f.x, dy = pelY[p]! - f.y, d = dx * dx + dy * dy;
+      if (d < bd) (bd = d), (best = p);
     }
+    if (best >= 0) (F[QX] = pelX[best]!), (F[QY] = pelY[best]!);
+    return best;
   }
   function startWave() {
     G[PHASE] = P_CARD;
     G[PH_T] = demo ? 1.2 : 2.8;
     G[WAVE_T] = 0;
-    G[POWER] = 0;
     for (let is1 = 0; is1 < sites.length; is1++) { const s = sites[is1]!; s.on = false; }
     for (let i = coverN; i < blocks.length; i++) (blocks[i]!.hp = 0), (blocks[i]!.site = -2);
-    pipes = pellets = 0;
     // The letters come back each wave (the page heals between cartridges).
     for (let g = 0; g < glyphs; g++) (gate[g] = 0), (gres[g] = -1);
-    G[BUGS_LEFT] = count(0);
-    for (let n = count(1); n > 0; n--) addSite(FACTORY);
-    for (let n = count(2); n > 0; n--) addSite(BASE);
-    const np = count(3);
-    if (np) layPipes(np);
-    G[FLIES_LEFT] = count(4);
+    // Each section escalates: more foes, faster (LVL), tougher, a mini-boss on its fourth wave.
+    const sec = section(), k = step(), fin = sec === 4;
+    G[LVL] = k + loops() * 2;
+    G[BUGS_LEFT] = sec === 0 ? sized(12 + 6 * k) : fin ? sized(12) : 0;
+    const factories = sec === 1 ? 2 + (k >= 2 ? 1 : 0) : fin ? 1 : 0, bases = sec === 2 ? (k ? 2 : 1) : fin ? 1 : 0;
+    for (let n = Math.min(factories, Math.max(1, Math.round(factories * Math.min(1, area + 0.15)))); n > 0; n--) addSite(FACTORY);
+    for (let n = Math.min(bases, area < 0.8 ? 1 : 2); n > 0; n--) addSite(BASE);
+    G[FLIES_LEFT] = sec === 3 ? sized(5 + 3 * k) : fin ? sized(6) : 0;
+    G[FROGS_LEFT] = sec === 3 || fin ? 1 : 0;
+    pellets = sec === 3 || fin ? Math.min(PCAP, Math.round((8 + 2 * k) * Math.min(1.2, area + 0.2))) : 0;
+    for (let p = 0; p < pellets; p++) (pelOn[p] = 0), placePellet(p);
     G[BUG_IN] = 0.4;
     G[FLY_IN] = 0.6;
     waveN++;
     e.events.emit("wave", G[WAVE]!);
+  }
+  /** The fight starts: the section's mini-boss on its fourth wave, Byte Runner's frog. */
+  function fightStarts() {
+    const sec = section(), k = step(), boss = k === 3 && sec < 4;
+    if (G[FROGS_LEFT]! > 0) frogIn(boss ? 6 : sec === 4 ? 2 : k), G[FROGS_LEFT]!--;
+    if (!boss) return;
+    let i = -1;
+    if (sec === 0) i = addFoe(BUG, W / 2, 40, 0, -1);
+    else if (sec === 1) i = addFoe(ALIEN, W / 2, 70, 2, -1);
+    else if (sec === 2) i = addFoe(ETANK, W / 2, 80, 0, -1);
+    if (i < 0) return;
+    const f = foes[i]!;
+    f.boss = 1;
+    if (sec === 0) (f.tier = 3), (f.eaten = 12);
+    f.max = f.hp = (sec === 0 ? 10 : sec === 1 ? 16 : 14) * (1 + loops() * 0.5);
+    e.events.emit("streak", -1);
   }
   function freeFoe() {
     for (let i = 0; i < MAXF; i++) if (!foes[i]!.on) return i;
@@ -1166,11 +1172,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     f.t = 0;
     f.flash = 0;
     f.food = -1;
-    f.pipe = -1;
     f.u = 0;
-    f.dir = 1;
+    f.boss = 0;
     f.recoil = 0;
-    f.max = f.hp = kind === BUG ? 1 : kind === ALIEN ? 1 + sub : kind === ETANK ? 3 : 1;
+    f.max = f.hp = kind === BUG ? 1 : kind === ALIEN ? 1 + sub : kind === ETANK ? 3 : kind === FROG ? 8 : 1;
     f.gx = x;
     f.gy = y;
     return i;
@@ -1180,24 +1185,36 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     const side = (R() * 4) | 0, along = R();
     const x = side === 0 ? along * W : side === 1 ? W + 10 : side === 2 ? along * W : -10;
     const y = side === 0 ? 50 : side === 1 ? 60 + along * (H - 80) : H + 10, yy = side === 3 ? 60 + along * (H - 80) : y;
-    for (let k = 0; k < 4 && G[BUGS_LEFT]! > 0; k++, G[BUGS_LEFT]!--) addFoe(BUG, x + (R() - 0.5) * 40, yy + (R() - 0.5) * 40, 0, -1);
+    for (let k = 0; k < 4 && G[BUGS_LEFT]! > 0; k++, G[BUGS_LEFT]!--) {
+      const i = addFoe(BUG, x + (R() - 0.5) * 40, yy + (R() - 0.5) * 40, 0, -1);
+      // Later in the section some arrive already grown (six letters in).
+      if (i >= 0 && step() >= 2 && R() < 0.35) (foes[i]!.tier = 2), (foes[i]!.eaten = 6), (foes[i]!.hp = foes[i]!.max = 2);
+    }
   }
-  /** A fly hops onto a pipe's end. */
+  /** A fly comes in from an edge. */
   function flyIn() {
-    if (!pipes) return;
-    const p = (R() * pipes) | 0, end = R() < 0.5;
-    (F[PU] = end ? pipeLen[p]! : 0), onPipe(p);
-    const i = addFoe(FLY, F[QX]!, F[QY]!, (G[FLIES_LEFT]! | 0) % 3, -1);
+    const side = (R() * 4) | 0, along = R();
+    const x = side === 1 ? W + 10 : side === 3 ? -10 : along * W, y = side === 0 ? 50 : side === 2 ? H + 10 : 60 + along * (H - 80);
+    if (addFoe(FLY, x, y, (G[FLIES_LEFT]! | 0) % 3, -1) >= 0) G[FLIES_LEFT]!--;
+  }
+  /** Byte Runner's frog hops in from the side, already `ate` pellets fat (the mini-boss: big enough to eat you). */
+  function frogIn(ate: number) {
+    const left = R() < 0.5, i = addFoe(FROG, left ? -10 : W + 10, H * (0.35 + R() * 0.4), 0, -1);
     if (i < 0) return;
     const f = foes[i]!;
-    f.pipe = p;
-    f.u = end ? pipeLen[p]! : 0;
-    f.dir = end ? -1 : 1;
-    G[FLIES_LEFT]!--;
+    for (let k = 0; k < ate; k++) frogGrows(f);
+    f.boss = ate >= 6 ? 1 : 0;
+  }
+  /** A frog ate a pellet: bigger, tougher, and at four pellets big enough to eat a ride. */
+  function frogGrows(f: Foe) {
+    f.eaten++;
+    f.tier = Math.min(6, 1 + (f.eaten >> 1));
+    f.max += 2;
+    f.hp += 2;
   }
   /** Is the wave beaten? No foes, no standing factory or core, nothing left to come. */
   function cleared() {
-    if (G[BUGS_LEFT]! > 0 || G[FLIES_LEFT]! > 0) return false;
+    if (G[BUGS_LEFT]! > 0 || G[FLIES_LEFT]! > 0 || G[FROGS_LEFT]! > 0) return false;
     for (let i = 0; i < MAXF; i++) if (foes[i]!.on) return false;
     for (let i = 0; i < SITES; i++) if (sites[i]!.on && sites[i]!.hp > 0) return false;
     return true;
@@ -1293,6 +1310,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   /** The partner (and both rides in the attract match): Blitz's bot brain, given a ride's job. */
   function ai(u: Unit) {
     const dt = G[DTS]!;
+    if (dodge(u)) return;
     const other = crew[1 - u.i]!;
     u.think -= dt;
     if (u.think <= 0) {
@@ -1301,18 +1319,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       const cx = other.alive ? other.x * 0.5 + u.x * 0.5 : u.x, cy = other.alive ? other.y * 0.5 + u.y * 0.5 : u.y;
       u.target = pick(u, cx, cy, 900);
       let gxx = -1, gyy = 0;
-      // Hurt: a heal tile or a crate first. Byte Runner: the tank goes for a power square when flies are near.
+      // Hurt: a heal tile or a crate first.
       if (u.hp <= MAXHP[u.kind]! / 2)
         for (let is2 = 0; is2 < tiles.length; is2++) { const s = tiles[is2]!; if (s.on && s.roll <= 0 && (s.type === HEAL || s.type === SHIELD) && Math.sqrt(((s.c + 0.5) * T - u.x) * ((s.c + 0.5) * T - u.x) + ((s.r + 0.5) * T - u.y) * ((s.r + 0.5) * T - u.y)) < 360) (gxx = (s.c + 0.5) * T), (gyy = (s.r + 0.5) * T); }
       for (let i = 0; i < supply.count && gxx < 0; i++) if (supply.landed(i) && Math.sqrt((supply.x[i]! - u.x) * (supply.x[i]! - u.x) + (supply.y[i]! - u.y) * (supply.y[i]! - u.y)) < 420) (gxx = supply.x[i]!), (gyy = supply.y[i]!);
-      if (gxx < 0 && pipes && G[POWER]! <= 0 && u.kind === TANK)
-        for (let p = 0; p < pellets; p++) if (pelOn[p] && pelPow[p] && Math.sqrt((pelX[p]! - u.x) * (pelX[p]! - u.x) + (pelY[p]! - u.y) * (pelY[p]! - u.y)) < 380) (gxx = pelX[p]!), (gyy = pelY[p]!), (p = pellets);
-      // Power on: chase the nearest blue fly to eat it.
-      if (gxx < 0 && G[POWER]! > 0.6)
-        for (let i = 0, bd = 520; i < MAXF; i++) {
-          const f = foes[i]!;
-          if (f.on && f.kind === FLY && Math.sqrt((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y)) < bd) (bd = Math.sqrt((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y))), (gxx = f.x), (gyy = f.y);
-        }
       if (gxx >= 0) (u.gx = gxx), (u.gy = gyy);
       else if (where(u.target)) {
         // Keep a ride's distance: the plane circles close, the tank stands off (a base: up to the wall).
@@ -1344,6 +1354,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       hyp();
       if (u.cool <= 0 && u.charge <= 0 && err < 0.14 && F[HO]! < (u.kind === PLANE ? 520 : 470)) fire(u);
     } else (F[TT] = u.a), (F[TM] = 3 * dt), turretF(u);
+  }
+  /** A frog has its tongue on u's spot (the tell): u gets out of the way. True while it's dodging. */
+  function dodge(u: Unit) {
+    for (let i = 0; i < MAXF; i++) {
+      const f = foes[i]!;
+      if (!f.on || f.kind !== FROG || f.mode !== 1) continue;
+      const dx = u.x - f.gx, dy = u.y - f.gy, d = Math.sqrt(dx * dx + dy * dy);
+      if (d > 70 * scale) continue;
+      (F[DX] = d ? dx / d : 1), (F[DY] = d ? dy / d : 0), (F[DT] = G[DTS]!), drive(u);
+      return true;
+    }
+    return false;
   }
   /**
    * The seam: the one place a ride's controls come from. You (this screen's input) or the AI.
@@ -1383,7 +1405,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function bugStep(f: Foe, idx: number) {
     const dt = G[DTS]!;
     f.t += dt;
-    const sp = (70 + f.tier * 18 + Math.min(40, G[WAVE]! * 3)) * (scale / 1.4);
+    const sp = (70 + f.tier * 18 + G[LVL]! * 8) * (scale / 1.4);
     if (f.tier < 3 && glyphs) {
       if (f.food < 0 || gate[f.food]) {
         // The nearest uneaten, unreserved letter.
@@ -1451,12 +1473,13 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     (F[SPD] = (110 - f.sub * 18) * (scale / 1.4)), (F[GRIP] = 2.4), steerF(f);
     f.a = Math.PI / 2;
     if ((f.cool -= dt) <= 0 && target >= 0) {
-      f.cool = 1.8 + R() * 1.6 - Math.min(0.8, G[WAVE]! * 0.06);
+      f.cool = 1.8 + R() * 1.6 - Math.min(0.8, G[LVL]! * 0.15);
       const u = crew[target]!;
       if (Math.sqrt((u.x - f.x) * (u.x - f.x) + (u.y - f.y) * (u.y - f.y)) < 420) {
         F[SX] = f.x;
         F[SY] = f.y + 10;
-        ((F[SA] = Math.atan2(u.y - f.y, u.x - f.x) + (R() - 0.5) * 0.2), (F[SS] = 250), (F[SL] = 2.2), shoot(-1, true, K_ALIEN));
+        // The mothership fires a fan of three.
+        for (let n = f.boss ? -1 : 0; n <= f.boss; n++) ((F[SA] = Math.atan2(u.y - f.y, u.x - f.x) + n * 0.3 + (R() - 0.5) * 0.2), (F[SS] = 250), (F[SL] = 2.2), shoot(-1, true, K_ALIEN));
       }
     }
   }
@@ -1478,7 +1501,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     const dx = f.gx - f.x, dy = f.gy - f.y, d = Math.sqrt(dx * dx + dy * dy);
     if (d > 16) {
       (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt);
-      (dv[0] = f.x), (dv[1] = f.y), (dv[2] = f.a), (F[SPD] = 92 + Math.min(40, G[WAVE]! * 4)), driveF(dv);
+      (dv[0] = f.x), (dv[1] = f.y), (dv[2] = f.a), (F[SPD] = (92 + G[LVL]! * 8) * (f.boss ? 0.7 : 1)), driveF(dv);
       if (Math.abs(dv[0]! - f.x) + Math.abs(dv[1]! - f.y) < 0.01) f.think = Math.min(f.think, 0.1);
       f.x = dv[0]!;
       f.y = dv[1]!;
@@ -1493,43 +1516,107 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       f.cool = 1.5 + R() * 1.1;
       F[SX] = f.x + Math.cos(f.ta) * 30;
       F[SY] = f.y + Math.sin(f.ta) * 30;
-      ((F[SA] = f.ta + (R() - 0.5) * 0.08), (F[SS] = 430), (F[SL] = 1.2), shoot(-1, true, K_ETANK));
+      // The heavy fires three shells.
+      for (let n = f.boss ? -1 : 0; n <= f.boss; n++) ((F[SA] = f.ta + n * 0.18 + (R() - 0.5) * 0.08), (F[SS] = 430), (F[SL] = 1.2), shoot(-1, true, K_ETANK));
       f.recoil = 6;
       ((FQ[0] = 1), (FQ[1] = F[SX]!), (FQ[2] = F[SY]!), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 8), (FQ[6] = 0.12), (FQ[7] = 2), fxPush(FX_SPAWN));
       e.events.emit("shot", -1);
     }
   }
-  /** Byte Runner's fly: races its pipe, hops off to chase (violet straight, pink ahead of you, cyan roams). */
+  /** Byte Runner's fly: goes for the pellets on the blocks (each one eaten: tougher, faster, bigger),
+   *  else chases you (violet straight at you, pink where you're going, cyan wherever). */
   function flyStep(f: Foe) {
     const dt = G[DTS]!;
     f.t += dt;
-    const blue = G[POWER]! > 0, sp = (blue ? 110 : 150 + Math.min(60, G[WAVE]! * 5)) * (scale / 1.4);
-    if (f.pipe >= 0) {
-      f.u += f.dir * 240 * (scale / 1.4) * dt;
-      if (f.u <= 0 || f.u >= pipeLen[f.pipe]!) (f.dir = -f.dir), (f.u = Math.max(0, Math.min(pipeLen[f.pipe]!, f.u)));
-      const px = f.x, py = f.y;
-      (F[PU] = f.u), onPipe(f.pipe);
-      f.x = F[QX]!;
-      f.y = F[QY]!;
-      f.vx = (f.x - px) / dt;
-      f.vy = (f.y - py) / dt;
-      // Off the pipe when a ride is near (blue flies stay on their pipes, running).
-      if (!blue && (f.think -= dt) <= 0) {
-        f.think = 0.5;
-        const k = nearestRide(f, false);
-        if (k >= 0 && Math.sqrt((F[QX]! - f.x) * (F[QX]! - f.x) + (F[QY]! - f.y) * (F[QY]! - f.y)) < 300 && R() < 0.5) (f.pipe = -1), (f.t = 0);
+    const sp = (140 + G[LVL]! * 10 + (f.tier - 1) * 30) * (scale / 1.4);
+    const k = nearestRide(f, false), rx = F[QX]!, ry = F[QY]!;
+    const food = f.tier < 3 ? nearestPellet(f, 380) : -1;
+    if (food >= 0 && (k < 0 || (F[QX]! - f.x) ** 2 + (F[QY]! - f.y) ** 2 < ((rx - f.x) ** 2 + (ry - f.y) ** 2) * 1.4)) {
+      if (Math.abs(F[QX]! - f.x) < 10 && Math.abs(F[QY]! - f.y) < 10) {
+        eatPellet(food);
+        f.eaten++;
+        f.tier = Math.min(3, f.tier + 1);
+        f.max++;
+        f.hp++;
+        ((FQ[0] = f.x), (FQ[1] = f.y - 22), (FQ[2] = W_GULP), (FQ[3] = 8), (FQ[4] = 13), fxPush(FX_WORD));
       }
-      return;
+    } else {
+      if (k < 0) return;
+      const u = crew[k]!;
+      if (f.sub === 1) (F[QX] = u.x + Math.cos(u.a) * 90), (F[QY] = u.y + Math.sin(u.a) * 90);
+      else if (f.sub === 2) (F[QX] = u.x + Math.cos(f.t * 1.7) * 110), (F[QY] = u.y + Math.sin(f.t * 1.3) * 110);
+      else (F[QX] = rx), (F[QY] = ry);
     }
-    const k = nearestRide(f, false);
-    if (k < 0) return;
-    const u = crew[k]!;
-    if (blue) (F[QX] = f.x * 2 - u.x), (F[QY] = f.y * 2 - u.y);
-    else if (f.sub === 1) (F[QX] = u.x + Math.cos(u.a) * 90), (F[QY] = u.y + Math.sin(u.a) * 90);
-    else if (f.sub === 2) (F[QX] = u.x + Math.cos(f.t * 1.7) * 110), (F[QY] = u.y + Math.sin(f.t * 1.3) * 110);
     (F[SPD] = sp), (F[GRIP] = 3.2), steerF(f);
     f.x = Math.max(16, Math.min(W - 16, f.x));
     f.y = Math.max(56, Math.min(H - 16, f.y));
+  }
+  /** Byte Runner's frog: hops from pellet to pellet and grows with each one. At four pellets it's big
+   *  enough to eat a ride: it stops, its tongue marks the spot for a beat (the tell), then strikes:
+   *  whatever is still on the spot is eaten whole. */
+  function frogStep(f: Foe) {
+    const dt = G[DTS]!;
+    f.t += dt;
+    f.cool -= dt;
+    const size = 1 + Math.min(1.2, f.eaten * 0.15), big = f.eaten >= 4;
+    if (f.mode === 1) {
+      f.vx = f.vy = 0;
+      if ((f.think -= dt) <= 0) {
+        f.mode = 2;
+        f.think = 0.25;
+        for (let k = 0; k < 2; k++) {
+          const u = crew[k]!;
+          if (!u.alive || u.drop < 1) continue;
+          const dx = u.x - f.gx, dy = u.y - f.gy;
+          if (dx * dx + dy * dy > (34 * scale) ** 2) continue;
+          if (u.shield > 0) {
+            ((FQ[0] = 2), (FQ[1] = u.x), (FQ[2] = u.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 24), (FQ[6] = 0.3), (FQ[7] = 4), fxPush(FX_SPAWN));
+            continue;
+          }
+          u.hp = 0;
+          ((FQ[0] = u.x), (FQ[1] = u.y - 40), (FQ[2] = W_EATEN), (FQ[3] = 3), (FQ[4] = 24), fxPush(FX_WORD));
+          wreck(u);
+        }
+      }
+      return;
+    }
+    if (f.mode === 2) {
+      if ((f.think -= dt) <= 0) (f.mode = 0), (f.cool = 2.4);
+      return;
+    }
+    const k = nearestRide(f, false);
+    if (big && k >= 0 && f.cool <= 0 && (F[QX]! - f.x) ** 2 + (F[QY]! - f.y) ** 2 < ((110 + 30 * size) * scale) ** 2) {
+      // The tell: the tongue marks where the ride is now.
+      f.mode = 1;
+      f.think = 0.9;
+      f.gx = F[QX]!;
+      f.gy = F[QY]!;
+      f.a = f.gx < f.x ? Math.PI : 0;
+      e.events.emit("lock", -1);
+      return;
+    }
+    // Hungry: the nearest pellet; a big frog goes for you when you're close.
+    const food = nearestPellet(f, 2000);
+    if (food < 0 || (big && k >= 0 && (crew[k]!.x - f.x) ** 2 + (crew[k]!.y - f.y) ** 2 < (320 * scale) ** 2)) {
+      if (k < 0) return;
+      (F[QX] = crew[k]!.x), (F[QY] = crew[k]!.y);
+    } else if (Math.abs(F[QX]! - f.x) < 14 * size && Math.abs(F[QY]! - f.y) < 14 * size) {
+      eatPellet(food);
+      frogGrows(f);
+      ((FQ[0] = f.x), (FQ[1] = f.y - 34 * size), (FQ[2] = W_GULP), (FQ[3] = 5), (FQ[4] = 16), fxPush(FX_WORD));
+    }
+    // Hops: a burst toward the goal, then a sit.
+    if ((f.u -= dt) <= -0.35) {
+      const dx = F[QX]! - f.x, dy = F[QY]! - f.y, d = Math.sqrt(dx * dx + dy * dy) || 1, sp = (170 + G[LVL]! * 12) * (scale / 1.4);
+      f.u = 0.32;
+      f.vx = (dx / d) * sp;
+      f.vy = (dy / d) * sp;
+      if (dx) f.a = dx < 0 ? Math.PI : 0;
+    }
+    if (f.u > 0) (f.x += f.vx * dt), (f.y += f.vy * dt);
+    else f.vx = f.vy = 0;
+    f.x = Math.max(20, Math.min(W - 20, f.x));
+    f.y = Math.max(60, Math.min(H - 20, f.y));
   }
   /** Sites: factories release aliens (up to 5 each at a time); bases sortie tanks and shoot back. */
   function siteStep(s: Site, idx: number) {
@@ -1549,12 +1636,12 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     for (let i = 0; i < MAXF; i++) if (foes[i]!.on && foes[i]!.home === idx) mine++;
     if ((s.t -= dt) <= 0) {
       if (s.kind === FACTORY && mine < 6) {
-        s.t = 2.6 - Math.min(1, G[WAVE]! * 0.08);
+        s.t = 2.6 - Math.min(1, G[LVL]! * 0.25);
         addFoe(ALIEN, s.x + (R() - 0.5) * s.w * 0.6, s.y - s.h / 2, (R() * 3) | 0, idx);
         ((FQ[0] = 2), (FQ[1] = s.x), (FQ[2] = s.y - s.h / 2), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 18), (FQ[6] = 0.35), (FQ[7] = 4), fxPush(FX_SPAWN));
       } else if (s.kind === BASE && mine < 3) {
         // Out through the gap below the base.
-        s.t = 5.5 - Math.min(2, G[WAVE]! * 0.15);
+        s.t = 5.5 - Math.min(2, G[LVL]! * 0.5);
         const i = addFoe(ETANK, s.x + (s.out++ % 2 ? -1 : 1) * (s.w / 2 + T * 0.9), s.y + s.h / 2 + T * 0.9, 0, idx);
         if (i >= 0) foes[i]!.a = foes[i]!.ta = Math.PI / 2;
       } else s.t = 1;
@@ -1670,17 +1757,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     // The wave: its card, the fight, cleared.
     G[WAVE_T]! += dt;
     if (G[PHASE] === P_CARD) {
-      if ((G[PH_T]! -= dt) <= 0) G[PHASE] = P_FIGHT;
+      if ((G[PH_T]! -= dt) <= 0) (G[PHASE] = P_FIGHT), fightStarts();
     } else if (G[PHASE] === P_FIGHT) {
       if (G[BUGS_LEFT]! > 0 && (G[BUG_IN]! -= dt) <= 0) bugIn(), (G[BUG_IN] = 2.4 + R() * 1.2);
       if (G[FLIES_LEFT]! > 0 && (G[FLY_IN]! -= dt) <= 0) flyIn(), (G[FLY_IN] = 1.3 + R() * 0.8);
       if (cleared()) {
         G[PHASE] = P_CLEAR;
         G[PH_T] = demo ? 1.5 : 2.6;
-        const bonus = 300 + Math.max(0, Math.round(120 - G[WAVE_T]!)) * 5;
+        const bonus = 300 + Math.max(0, Math.round(120 - G[WAVE_T]!)) * 5, sec = step() === 3 && section() < 4;
         score(bonus);
-        if (!embed && !demo) G[DROPS]!++;
-        (bannerKind = 2), (bannerV = bonus), bannerN++;
+        // One more drop for each section cleared (not each wave: seventeen waves of drops is too many).
+        if (sec && !embed && !demo) G[DROPS]!++;
+        (bannerKind = sec ? 3 : 2), (bannerV = bonus), bannerN++;
         e.events.emit("win", 0);
       }
     } else if ((G[PH_T]! -= dt) <= 0) {
@@ -1690,7 +1778,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     return false;
   }
-  /** Tiles, crates, cover growing back, the power timer, pellets. */
+  /** Tiles, crates, cover growing back, pellets. */
   function boardStep() {
     const dt = G[DTS]!;
     // Tiles blink in; crates parachute in.
@@ -1708,9 +1796,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       const b = blocks[i]!;
       if (b.hp <= 0 && (b.back -= dt) <= 0 && !rideOn(b) && ((F[BX] = b.x + b.w / 2), (F[BY] = b.y + b.h / 2), (F[BR] = b.w), siteAt() < 0)) b.hp = 3;
     }
-    if (G[POWER]! > 0) G[POWER] = Math.max(0, G[POWER]! - dt);
-    // Pellets come back on the simulation clock (Byte Runner).
-    for (let p = 0; p < pellets; p++) if (!pelOn[p] && !pelPow[p] && (pelBack[p]! -= dt) <= 0) pelOn[p] = 1;
+    // Eaten pellets come back on another block, on the simulation clock (Byte Runner).
+    for (let p = 0; p < pellets; p++) if (!pelOn[p] && (pelBack[p]! -= dt) <= 0) placePellet(p);
   }
   /** Your rides: respawn, land, timers, controls, pickups. */
   function ridesStep() {
@@ -1763,7 +1850,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     u.y = Math.max(54, Math.min(H - 18, u.y));
     if (u.kind === PLANE) (u.vx = u.x <= 18 || u.x >= W - 18 ? 0 : u.vx), (u.vy = u.y <= 54 || u.y >= H - 18 ? 0 : u.vy);
   }
-  /** Tiles, crates, pellets and power squares under a ride (the plane swoops low enough to grab them). */
+  /** Tiles and crates under a ride (the plane swoops low enough to grab them). */
   function pickups(u: Unit) {
     for (let is6 = 0; is6 < tiles.length; is6++) { const s = tiles[is6]!;
       if (!s.on || s.roll > 0) continue;
@@ -1771,18 +1858,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (u.x >= x0 && u.x <= x0 + T && u.y >= y0 && u.y <= y0 + T && (s.type !== MINE || u.kind === TANK)) takeTile(s, u);
     }
     for (let k = supply.count - 1; k >= 0; k--) if (supply.landed(k) && ((F[HX] = supply.x[k]! - u.x), (F[HY] = supply.y[k]! - u.y), hyp(), F[HO]! < 26 * scale)) takeCrate(k, u);
-    // Pellets and power squares (Byte Runner): eat them as you pass.
-    for (let p = 0; p < pellets; p++) {
-      if (!pelOn[p] || Math.abs(pelX[p]! - u.x) > 16 * scale || Math.abs(pelY[p]! - u.y) > 16 * scale) continue;
-      pelOn[p] = 0;
-      if (pelPow[p]) {
-        G[POWER] = Math.min(9, G[POWER]! + 6);
-        G[CHAIN] = 0;
-        ((FQ[0] = 2), (FQ[1] = pelX[p]!), (FQ[2] = pelY[p]!), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 40), (FQ[6] = 0.6), (FQ[7] = 3), fxPush(FX_SPAWN));
-        ((FQ[0] = pelX[p]!), (FQ[1] = pelY[p]! - 26), (FQ[2] = W_POWER), (FQ[3] = 3), (FQ[4] = 20), fxPush(FX_WORD));
-        e.events.emit("power", u.i);
-      } else (pelBack[p] = 12), score(1), u.you && e.events.emit("chomp", 0);
-    }
     if (embed) for (const c of covers) if (u.kind === TANK && inRect(u.x, u.y, c.x, c.y + c.h * 0.2, c.w, c.h * 0.7)) knock(c, 0, 0, 1, true);
   }
   /** The two rides keep a little apart (a tank can't sit inside the plane's shadow forever). */
@@ -1806,32 +1881,19 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (f.kind === BUG) bugStep(f, i);
       else if (f.kind === ALIEN) alienStep(f);
       else if (f.kind === ETANK) etankStep(f);
+      else if (f.kind === FROG) frogStep(f);
       else flyStep(f);
       if (!f.on) continue;
-      // Contact: bugs bite, flies sting (or get eaten when they're blue), your tank squashes small bugs.
-      if (f.kind === BUG || f.kind === FLY)
+      // Contact: bugs bite, flies sting, a small frog bites; your tank squashes small bugs.
+      if (f.kind === BUG || f.kind === FLY || (f.kind === FROG && f.eaten < 4))
         for (let k = 0; k < 2; k++) {
           const u = crew[k]!;
           if (!u.alive || u.drop < 1) continue;
           F[HX] = u.x - f.x;
           F[HY] = u.y - f.y;
           hyp();
-          if (F[HO]! > 20 * scale) continue;
-          if (f.kind === FLY && G[POWER]! > 0) {
-            // Byte Runner: 100, 200, 300, then 400 a fly while the power lasts.
-            G[CHAIN] = Math.min(4, G[CHAIN]! + 1);
-            f.on = false;
-            ((FQ[0] = 2), (FQ[1] = f.x), (FQ[2] = f.y), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 26), (FQ[6] = 0.4), (FQ[7] = 3), fxPush(FX_SPAWN));
-            debris(f.x, f.y, 6, 8, 120);
-            credit(k, G[CHAIN]! * 100, 3, f.x, f.y);
-            ((FQ[0] = f.x), (FQ[1] = f.y - 30), (FQ[2] = W_EAT + G[CHAIN]! - 1), (FQ[3] = 3), (FQ[4] = 18), fxPush(FX_WORD));
-            feedK[feedN % 8] = k;
-            feedV[feedN % 8] = FLY;
-            feedN++;
-            e.events.emit("power", k);
-            break;
-          }
-          if (f.kind === BUG && u.kind === TANK && f.tier < 3) {
+          if (F[HO]! > (f.kind === FROG ? 26 : 20) * scale) continue;
+          if (f.kind === BUG && u.kind === TANK && f.tier < 3 && !f.boss) {
             ((F[AMT] = 99), hurtFoe(f, k));
             ((FQ[0] = f.x), (FQ[1] = f.y - 16), (FQ[2] = W_SQUASH), (FQ[3] = 2), (FQ[4] = 13), fxPush(FX_WORD));
             break;
@@ -1890,7 +1952,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         for (let i = 0; i < MAXF && !done; i++) {
           const f = foes[i]!;
           if (!f.on || (s.rail && s.tgt !== i && s.tgt >= 0 && owner.kind === PLANE)) continue;
-          if (f.kind === FLY && G[POWER]! > 0) continue; // blue flies: eat them, don't shoot them
           if (((F[QX] = f.x), (F[QY] = f.y), sweep(s))) {
             done = true;
             ((FQ[0] = f.x), (FQ[1] = f.y), (FQ[2] = s.rail ? 1.6 : 0.7), (FQ[3] = s.rail ? 1 : s.kind === K_BOLT ? 4 : 2), boomQ());
@@ -1982,7 +2043,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   ] as const;
   const dirKey = $<HTMLButtonElement>("[data-dir]"), dirCard = $<HTMLElement>("#cf-dir"), keyed = () => wrap.classList.contains("nofs");
   const dir = (on: boolean) => ((dirCard.hidden = !on), dirKey.setAttribute("aria-expanded", "" + on));
-  dirCard.innerHTML = FACTIONS.slice(0, 4).map(([n, c], k) => `<span><i style="--c:${c}">${k + 1}</i> <b>${n}</b></span>`).join("") + `<span><i style="--c:#ff2e88">5</i> <b>ALL FOUR</b></span>`;
+  dirCard.innerHTML = FACTIONS.slice(0, 4).map(([n, c], k) => `<span><i style="--c:${c}">S${k + 1}</i> <b>${n}</b> ×4</span>`).join("") + `<span><i style="--c:#ff2e88">FINALE</i> <b>ALL FOUR</b></span>`;
   dirKey.addEventListener("click", () => dir(dirCard.hidden as boolean), { signal: e.signal });
   addEventListener("keydown", (ev) => keyed() && !dirCard.hidden && ev.code === "Escape" && (ev.stopPropagation(), dir(false), dirKey.focus()), { capture: true, signal: e.signal });
   wrap.addEventListener("pointerdown", (ev) => keyed() && !dirKey.contains(ev.target as Node) && !dirCard.contains(ev.target as Node) && dir(false), { signal: e.signal });
@@ -2006,7 +2067,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     over.hidden = false;
     over.classList.add("intro");
     dir(!keyed());
-    over.innerHTML = `<div class="sticker" role="img" aria-label="DOM Crossfire">${BADGE}<b>CROSS<em>FIRE</em></b><span>CO-OP · ${WAVES} WAVES</span></div>
+    over.innerHTML = `<div class="sticker" role="img" aria-label="DOM Crossfire">${BADGE}<b>CROSS<em>FIRE</em></b><span>CO-OP · 4 SECTIONS + FINALE</span></div>
 <div class="pick" role="group" aria-labelledby="cf-pick"><small id="cf-pick">PICK YOUR RIDE</small><div class="rides">${RIDES.map(([id, n, d], k) => `<button class="bui-key ride" type="button" data-ride="${id}" aria-pressed="${k === ride}" style="--rc:${RIDE_COLOR[k]}"><span class="pic">${k === PLANE ? shipSvg() : tankSvg(RIDE_COLOR[TANK]!)}</span><b>${n}</b><small>${d}</small><span class="you" aria-hidden="true">YOU</span></button>`).join("")}</div></div>
 <p class="mate" data-mate></p>
 <button class="bui-sticker-key bui-call" type="button" data-go aria-label="Press start">${PLAY}<b>PRESS START</b></button>`;
@@ -2071,7 +2132,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     G.fill(0);
     G[DROPS] = 4;
     G[CRATE_IN] = 14;
-    pipes = pellets = 0;
+    pellets = 0;
     for (const u of crew) Object.assign(u, mkUnit(u.i));
     cast();
     rideKeys();
@@ -2128,9 +2189,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function hudFrame() {
     const sc = String(Math.round(G[SCORE]!));
     if (sc !== last.sc) hud.sc.textContent = last.sc = sc;
-    const wi = Math.max(1, G[WAVE]!), wv = embed || demo ? String(wi) : `${Math.min(wi, WAVES)}/${WAVES}`, fc = FACTIONS[(wi - 1) % 5]!;
+    const sec = section(), fc = FACTIONS[sec]!, wv = sec === 4 ? "ALL" : `${step() + 1}/${PER}`;
     if (wv !== last.wv) hud.wv.textContent = last.wv = wv;
-    const wl = SHORT[(wi - 1) % 5]!;
+    const wl = sec === 4 ? "FINALE" : `S${sec + 1} · ${SHORT[sec]}`;
     if (wl !== last.wl) (hud.wl.textContent = last.wl = wl), hud.wv.parentElement!.style.setProperty("--wc", fc[1]);
     const dr = embed ? "∞" : String(G[DROPS]!);
     if (dr !== last.dr) hud.dr.textContent = last.dr = dr;
@@ -2176,8 +2237,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     // The banner: a kill streak, a weapon tier, a wave cleared.
     if (bannerShown !== bannerN) {
       bannerShown = bannerN;
-      banner.querySelector("b")!.textContent = bannerKind === 0 ? `${bannerV} KILL STREAK` : bannerKind === 1 ? `${TIER_NAME[bannerV]} GUNS` : "WAVE CLEAR";
-      banner.querySelector("span")!.textContent = bannerKind === 0 ? STREAK[bannerV]! : bannerKind === 1 ? "WEAPON TIER UP" : `+${bannerV} · +1 DROP`;
+      banner.querySelector("b")!.textContent = bannerKind === 0 ? `${bannerV} KILL STREAK` : bannerKind === 1 ? `${TIER_NAME[bannerV]} GUNS` : bannerKind === 3 ? "SECTION CLEAR" : "WAVE CLEAR";
+      banner.querySelector("span")!.textContent = bannerKind === 0 ? STREAK[bannerV]! : bannerKind === 1 ? "WEAPON TIER UP" : `+${bannerV}${bannerKind === 3 && !embed ? " · +1 DROP" : ""}`;
       banner.animate?.(
         [{ opacity: 0, transform: "scale(2.2)" }, { opacity: 1, transform: "scale(.94)", offset: 0.12 }, { opacity: 1, transform: "scale(1)", offset: 0.2 }, { opacity: 1, transform: "scale(1)", offset: 0.82 }, { opacity: 0, transform: "scale(.9) translateY(-14px)" }],
         { duration: 2200, easing: "ease-out" },
@@ -2186,9 +2247,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     // The wave card: the faction, its art, what it does, each ride's job.
     if (waveShown !== waveN) {
       waveShown = waveN;
-      const w = G[WAVE]!, [name, c, line, pj, tj] = FACTIONS[(w - 1) % 5]!;
+      const sec = section(), k = step(), [name, c, line, pj, tj, boss] = FACTIONS[sec]!;
+      const where = sec === 4 ? "FINALE · ALL FOUR ARMIES" : `SECTION ${sec + 1} · WAVE ${k + 1}/${PER}`;
       waveCard.style.setProperty("--fc", c);
-      waveCard.innerHTML = `<span class="art">${factionSvg((w - 1) % 5)}</span><small>WAVE ${w}${embed || demo ? "" : ` OF ${WAVES}`}</small> <b>${name}</b> <p>${line}</p> <div class="jobs"><span style="--c:${RIDE_COLOR[PLANE]}">PLANE · ${pj}</span> <span style="--c:${RIDE_COLOR[TANK]}">TANK · ${tj}</span></div>`;
+      waveCard.innerHTML = `<span class="art">${factionSvg(sec)}</span><small>${where}</small> <b>${name}</b> <p>${k === 3 && sec < 4 ? `MINI-BOSS: ${boss}. ` : ""}${line}</p> <div class="jobs"><span style="--c:${RIDE_COLOR[PLANE]}">PLANE · ${pj}</span> <span style="--c:${RIDE_COLOR[TANK]}">TANK · ${tj}</span></div>`;
       if (!demo) {
         const still = calm.matches;
         waveCard.animate?.(
@@ -2392,6 +2454,22 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.fillText(type === RAPID ? "»" : type === TRIPLE ? "≡" : type === SHIELD ? "◆" : "!", c, m + 1);
     }
   }
+  /** A Byte Runner fly's tier: pips under it (one per pellet it ate). */
+  function pips(f: Foe, dy: number, c: string) {
+    for (let k = 0; k < f.tier; k++) (ctx.fillStyle = k < f.tier ? c : "rgba(255,255,255,.16)"), ctx.fillRect(f.x - (f.tier * 5 - 2) / 2 + k * 5, f.y + dy, 3, 3);
+  }
+  /** A mini-boss: its name over it and a long health bar. */
+  function bossTag(f: Foe, dy: number) {
+    const name = FACTIONS[section() < 4 ? section() : 3]![5];
+    ctx.font = "900 11px ui-monospace,monospace";
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#07060f";
+    ctx.strokeText(name, f.x, f.y - dy - 10);
+    ctx.fillStyle = "#ff2b4e";
+    ctx.fillText(name, f.x, f.y - dy - 10);
+    bar(f.x, f.y - dy - 4, 60, f.hp / f.max, "#ff2b4e");
+  }
   /** A health bar over (x, y): `k` of 1, in colour c. */
   function bar(x: number, y: number, w: number, k: number, c: string) {
     ctx.fillStyle = lightTheme ? "rgba(7,6,15,.25)" : "rgba(7,6,15,.75)";
@@ -2489,38 +2567,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       }
       ctx.globalAlpha = 1;
     }
-    // Food pipes (Byte Runner): a soft maze edge, pellets, pink power squares.
-    if (pipes) {
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      for (const pass of [0, 1]) {
-        ctx.strokeStyle = pass ? (lightTheme ? "#d6f5c4" : "#16240f") : "#a8ff3e";
-        ctx.globalAlpha = pass ? 1 : 0.55;
-        ctx.lineWidth = pass ? T * 0.42 : T * 0.42 + 5;
-        for (let p = 0; p < pipes; p++) {
-          ctx.beginPath();
-          ctx.moveTo(pipeX[p * 4]!, pipeY[p * 4]!);
-          for (let j = 1; j < pipeN[p]!; j++) ctx.lineTo(pipeX[p * 4 + j]!, pipeY[p * 4 + j]!);
-          ctx.stroke();
-        }
-      }
-      ctx.globalAlpha = 1;
-      ctx.lineCap = "butt";
-      for (let p = 0; p < pellets; p++) {
-        if (!pelOn[p]) continue;
-        if (pelPow[p]) {
-          const s = 9 + 2 * Math.sin(now * 6 + p);
-          ctx.fillStyle = "#ff2e88";
-          ctx.fillRect(pelX[p]! - s, pelY[p]! - s, s * 2, s * 2);
-          ctx.strokeStyle = "#07060f";
-          ctx.lineWidth = 2;
-          ctx.strokeRect(pelX[p]! - s, pelY[p]! - s, s * 2, s * 2);
-        } else {
-          ctx.fillStyle = (p + ((now * 3) | 0)) % 9 ? "#fff5d7" : "#a8ff3e";
-          ctx.fillRect(pelX[p]! - 2.5, pelY[p]! - 2.5, 5, 5);
-        }
-      }
-    }
     for (const s of tiles) {
       if (!s.on) continue;
       const x = s.c * T + 3, y = s.r * T + 3, w = T - 6;
@@ -2571,6 +2617,17 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.fillRect(b.x + b.w / 2 - 6, b.y + b.h / 2 - 2, 12, 4);
     }
     for (const s of sites) if (s.on) buttonSite(s, now);
+    // Byte Runner's pellets, sitting on the blocks: food for the flies and the frog.
+    for (let p = 0; p < pellets; p++) {
+      if (!pelOn[p]) continue;
+      const g = 2.5 + Math.abs(Math.sin(now * 4 + p)) * 2;
+      ctx.fillStyle = "#07060f";
+      ctx.fillRect(pelX[p]! - 6, pelY[p]! - 6, 12, 12);
+      ctx.fillStyle = "#a8ff3e";
+      ctx.fillRect(pelX[p]! - 4 - g / 2, pelY[p]! - 4 - g / 2, 8 + g, 8 + g);
+      ctx.fillStyle = "#fff5d7";
+      ctx.fillRect(pelX[p]! - 3, pelY[p]! - 3, 6, 6);
+    }
     for (const m of marks) {
       if (!m.on) continue;
       const k = m.t / m.max;
@@ -2615,11 +2672,44 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (!f.on) continue;
       if (f.kind === BUG) {
         const moving = f.vx * f.vx + f.vy * f.vy > 4;
-        drawBug(ctx, f.x, f.y, f.a, f.tier, moving && !calm.matches ? ((now * 10 + f.sub) | 0) % 2 : 0, f.flash > 0, (1.05 + f.tier * 0.28) * (scale / 1.4));
+        drawBug(ctx, f.x, f.y, f.a, f.tier, moving && !calm.matches ? ((now * 10 + f.sub) | 0) % 2 : 0, f.flash > 0, (1.05 + f.tier * 0.28) * (scale / 1.4) * (f.boss ? 1.8 : 1));
+        if (f.boss) bossTag(f, 30 * scale);
         if (f.tier > 1) for (let k = 0; k < f.tier; k++) (ctx.fillStyle = k < f.hp ? (f.tier === 3 ? "#ff2b4e" : "#ff8a1f") : "rgba(255,255,255,.16)"), ctx.fillRect(f.x - (f.tier * 5 - 2) / 2 + k * 5, f.y + 16 * scale, 3, 3);
       } else if (f.kind === ETANK) {
-        drawTank(ctx, f.x, f.y, f.a, f.ta, f.flash > 0 ? "#fff4ff" : ETANK_COLOR, f.tread, f.recoil, false, scale * 0.95);
-        bar(f.x, f.y - 26 * scale, 26, f.hp / f.max, ETANK_COLOR);
+        drawTank(ctx, f.x, f.y, f.a, f.ta, f.flash > 0 ? "#fff4ff" : f.boss ? "#ff2b4e" : ETANK_COLOR, f.tread, f.recoil, false, scale * (f.boss ? 1.35 : 0.95));
+        if (f.boss) bossTag(f, 36 * scale);
+        else bar(f.x, f.y - 26 * scale, 26, f.hp / f.max, ETANK_COLOR);
+      } else if (f.kind === FROG) {
+        // The frog: grows with every pellet. A big one's tongue tell: a dashed line to the spot, blinking.
+        const size = 1 + Math.min(1.2, f.eaten * 0.15), left = f.a > 1.5, mx = f.x + (left ? -12 : 12) * size * scale * 0.9, my = f.y;
+        if (f.mode === 1) {
+          const blink = ((now * 10) | 0) % 2;
+          ctx.strokeStyle = blink ? "#ff2b4e" : "#ff5c8f";
+          ctx.lineWidth = 2.5;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(mx, my);
+          ctx.lineTo(f.gx, f.gy);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          brackets(f.gx, f.gy, 34 * scale * (0.7 + 0.3 * (f.think / 0.9)), ctx.strokeStyle, 3);
+        } else if (f.mode === 2) {
+          ctx.strokeStyle = "#ff5c8f";
+          ctx.lineWidth = 7 * size;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(mx, my);
+          ctx.lineTo(f.gx, f.gy);
+          ctx.stroke();
+          ctx.lineCap = "butt";
+          ctx.fillStyle = "#ff2b4e";
+          ctx.beginPath();
+          ctx.arc(f.gx, f.gy, 6 * size, 0, TAU);
+          ctx.fill();
+        }
+        drawFrog(ctx, f.x, f.y - (f.u > 0 ? Math.sin((f.u / 0.32) * Math.PI) * 10 : 0), left, f.mode ? 2 : f.eaten >= 4 ? 1 : 0, f.eaten >= 4, f.flash > 0, f.u > 0 ? 1 : 0, scale * 0.9 * size);
+        if (f.boss) bossTag(f, 30 * size * scale);
+        else bar(f.x, f.y - 24 * size * scale, 30, f.hp / f.max, "#3ecb74");
       }
     }
     // Your rides on the ground: the tank (and its parachute); the plane's shadow.
@@ -2687,13 +2777,16 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.fillRect(b.x - 6 * s, y - 12 * s, 12 * s, 3 * s);
     }
     // The air: flies, aliens, then the plane.
-    const blue = G[POWER]! > 0, blink = G[POWER]! < 2 && ((now * 6) | 0) % 2 === 1;
     for (const f of foes) {
       if (!f.on) continue;
-      if (f.kind === FLY) drawFly(ctx, f.x, f.y, f.sub, ((now * 16 + f.sub * 3) | 0) % 2, blue, blink, scale * 1.2);
+      if (f.kind === FLY) {
+        drawFly(ctx, f.x, f.y, f.sub, ((now * 16 + f.sub * 3) | 0) % 2, f.flash > 0, f.flash > 0, scale * (1.1 + (f.tier - 1) * 0.3));
+        if (f.tier > 1) pips(f, 14 * scale * (1 + (f.tier - 1) * 0.3), "#a8ff3e");
+      }
       else if (f.kind === ALIEN) {
-        drawAlien(ctx, f.x, f.y, f.sub, ((now * 3 + f.sub) | 0) % 2, f.flash > 0, scale * 0.95);
-        if (f.max > 1 && f.hp < f.max) bar(f.x, f.y - 20 * scale, 20, f.hp / f.max, "#f4457a");
+        drawAlien(ctx, f.x, f.y, f.sub, ((now * 3 + f.sub) | 0) % 2, f.flash > 0, scale * (f.boss ? 2.4 : 0.95));
+        if (f.boss) bossTag(f, 40 * scale);
+        else if (f.max > 1 && f.hp < f.max) bar(f.x, f.y - 20 * scale, 20, f.hp / f.max, "#f4457a");
       }
     }
     for (const u of crew) {
@@ -2755,15 +2848,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.beginPath();
       ctx.arc(input.pointer.x, input.pointer.y, 9, 0, TAU);
       ctx.stroke();
-    }
-    // Power on (Byte Runner): the board's edge pulses pink while the flies are blue.
-    if (blue && !demo) {
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.strokeStyle = "#ff2e88";
-      ctx.globalAlpha = blink ? 0.25 : 0.6;
-      ctx.lineWidth = 8;
-      ctx.strokeRect(4, 4, W - 8, H - 8);
-      ctx.globalAlpha = 1;
     }
   }
   /** Your ring (a marching dashed circle) or your partner's (thin), and a shield bubble. */
@@ -2949,8 +3033,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   resize();
   rideKeys();
   G[CRATE_IN] = 14;
-  // The attract match opens on the crossfire wave (all four armies on the board), then loops.
-  if (embed || demo) (G[WAVE] = demo ? 5 : 1), startWave();
+  // The attract match plays the finale (all four armies on the board), again and again.
+  if (embed || demo) (G[WAVE] = demo ? FINALE : 1), startWave();
   else intro();
   e.start();
 
@@ -2988,8 +3072,15 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       get pellets() {
         return pellets;
       },
-      /** Pellet i on the food pipes: [x, y, on, power square]. */
-      pellet: (i: number) => [pelX[i]!, pelY[i]!, pelOn[i]!, pelPow[i]!],
+      /** Pellet i (Byte Runner's food, on a block): [x, y, on]. */
+      pellet: (i: number) => [pelX[i]!, pelY[i]!, pelOn[i]!],
+      /** Where the match is: section 1-4 (5 the finale) and the wave in it (1-4). */
+      get section() {
+        return section() + 1;
+      },
+      get step() {
+        return step() + 1;
+      },
       get glyphs() {
         return glyphs;
       },
@@ -2997,9 +3088,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         let n = 0;
         for (let g = 0; g < glyphs; g++) n += gate[g]! ? 1 : 0;
         return n;
-      },
-      get power() {
-        return G[POWER]!;
       },
       get phase() {
         return G[PHASE]!;
@@ -3012,7 +3100,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       clear() {
         for (const f of foes) f.on = false;
         for (const st of sites) st.hp = 0;
-        G[BUGS_LEFT] = G[FLIES_LEFT] = 0;
+        G[BUGS_LEFT] = G[FLIES_LEFT] = G[FROGS_LEFT] = 0;
       },
       /** Skip to wave `w` (tests and screenshots): clears the board and starts it. */
       wave(w: number) {

@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.3.0
+
+- **Four waves a section.** Each army is now a section of four waves: more of them each wave, faster
+  (their speed and fire rate climb with the wave), tougher (grown bugs, sturdier factories and
+  cores), and a mini-boss on the fourth: the queen bug, the mothership (fans of three bolts), the
+  heavy tank (three shells a shot), the big frog. Then the finale: all four armies at once (17
+  waves in all). The HUD and the wave cards say "SECTION 2 · WAVE 3/4", or "FINALE".
+- **DROPS:** one more for each section cleared, not each wave (17 waves of drops made losing rare).
+- **Byte Runner, flipped:** no food pipes. Every Byte Runner character is a bad guy, the frog too.
+  The pellets sit on the board's blocks and are their food (eaten ones come back on another block):
+  a fly that eats one gets a tier (one more HP, faster, bigger, a pip), up to three. The frog grows
+  with every pellet; at four it's big enough to eat a ride: it stops, its tongue marks the ride's
+  spot for 0.9 s (a blinking dashed line and closing brackets), then strikes, and a plane or tank
+  still on the spot is eaten whole (an instant down; a shield saves you). Small frogs only bite.
+  The pink power squares (eat the flies) are gone.
+- The landing's Byte Runner card, the rules cards, the README and the rules test follow.
+
 ## 0.2.1
 
 - Click to fire on desktop: a held mouse button on the field fires from the moment you land, with

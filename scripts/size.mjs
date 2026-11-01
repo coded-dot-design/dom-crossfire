@@ -4,10 +4,12 @@
 // page.js 2,761 B; budgets are those plus a little headroom. The first cut was 39,980 / 39,773 B.
 // 0.2.1 (click to fire; the scoreboard no longer drags; effects and damage staged in registers):
 // 50,748 / 50,794 B, page.js 2,761 B.
+// 0.3.0 (four waves a section, mini-bosses, Byte Runner flipped: the frog, pellets on blocks): measured
+// 52,035 / 52,071 B (+1,287 / +1,277); budgets 51,200 → 52,480.
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 let failed = false;
-for (const [file, budget] of [["dist/dom-crossfire.js", 51200], ["dist/dom-crossfire.mjs", 51200], ["dist/page.js", 3072]]) {
+for (const [file, budget] of [["dist/dom-crossfire.js", 52480], ["dist/dom-crossfire.mjs", 52480], ["dist/page.js", 3072]]) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= budget;
   failed ||= !ok;
   console.log(`${ok ? "ok  " : "OVER"} ${file.padEnd(24)} ${gz} / ${budget} bytes gzip`);
