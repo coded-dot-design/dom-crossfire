@@ -3,7 +3,8 @@
 // drags; the touch lock holds while it runs; a finished round shows the result; Escape gives the
 // page back exactly. The pause card's SURRENDER key ends the round lost (where the type has it).
 // Reduced motion: the round plays with no sparks. The board page (index.html): PLAY starts the
-// game on it and Escape gives it back. On a phone: the touch pad (stick) and the bar on screen.
+// game on it and Escape gives it back. The layout at 1440, 390 and 360: the HUD, the arena and its
+// channel bar never cover the page. On a phone: the touch pad (stick) and the bar on screen.
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { launch, open, overlay } from "./harness.mjs";
@@ -119,6 +120,65 @@ try {
   assert.deepEqual(board.errors, []);
   await board.close();
 
+  // ---------- Layout: the HUD, the arena and its channel bar never cover the page ----------
+  // The board page at 1440, 390 and 360 while playing: the HUD clears the H1 and the arena, the
+  // arena block (bezel, screen and the channel bar when it shows) clears every page text block,
+  // the channel banner sits inside the arena, and Recall scrolls back to where PLAY was pressed.
+  const WW = 768, WH = 576; // the world (src/world.ts)
+  for (const [width, height, touch] of [[1440, 900, false], [390, 844, true], [360, 740, true]]) {
+    const at = `${width} px`, lay = await open(browser, { url: "/index.html", entry: null, width, height, touch });
+    const p = lay.page, mainBefore = await p.evaluate(() => document.querySelector("main").innerHTML);
+    const y0 = await p.evaluate(() => (document.getElementById("play").scrollIntoView({ block: "center" }), scrollY));
+    await p.click("#play");
+    await until(p, () => window.game?.getSnapshot().elapsed > 0.2);
+    // A channel change, so the banner is up (the hero kept alive for it).
+    await p.evaluate(() => { const w = window.game.world; w.s[5] = 1; w.g[4] = 29.5; });
+    await until(p, () => /\b[ab]\b/.test(document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".sk-ban").className));
+    await p.waitForTimeout(400);
+    const r = await p.evaluate(([WW, WH]) => {
+      const box = (b) => ({ x: b.left, y: b.top, r: b.right, b: b.bottom }), root = document.querySelector("[data-fizlet-host]").shadowRoot;
+      const [k, x, y] = window.game.view;
+      const visible = (b) => b.r > b.x && b.b > b.y && b.b > 0 && b.y < innerHeight;
+      return {
+        k,
+        hud: box(root.querySelector(".sk").getBoundingClientRect()),
+        h1: box(document.querySelector("h1").getBoundingClientRect()),
+        // The bezel (10 world units round the screen) and the channel bar (to WH + 42) under it.
+        arena: { x: x - 10 * k, y: y - 10 * k, r: x + (WW + 10) * k, b: y + (WH + (k > 0.75 ? 42 : 16)) * k },
+        screen: { x, y, r: x + WW * k, b: y + WH * k },
+        guide: k > 0.75 ? { x, y: y + (WH + 18) * k, r: x + WW * k, b: y + (WH + 42) * k } : null,
+        banner: box(root.querySelector(".sk-ban").getBoundingClientRect()),
+        text: [...document.querySelectorAll("main :is(h1,h2,p,li,footer,.row)")].map((el) => [el.tagName + " " + el.textContent.trim().slice(0, 24), box(el.getBoundingClientRect())]).filter(([, b]) => visible(b)),
+      };
+    }, [WW, WH]);
+    const meets = (a, b) => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
+    const show = (b) => `${Math.round(b.x)},${Math.round(b.y)} → ${Math.round(b.r)},${Math.round(b.b)}`;
+    assert.ok(r.k > 0.3, `${at}: the arena has a playable size (scale ${r.k})`);
+    assert.ok(!meets(r.hud, r.h1), `${at}: the HUD (${show(r.hud)}) clears the H1 (${show(r.h1)})`);
+    assert.ok(!meets(r.hud, r.arena), `${at}: the HUD (${show(r.hud)}) clears the arena (${show(r.arena)})`);
+    assert.ok(r.h1.y >= 0, `${at}: the H1 is on screen (${show(r.h1)})`);
+    for (const [name, b] of r.text) {
+      assert.ok(!meets(r.arena, b), `${at}: the arena block (${show(r.arena)}) clears "${name}" (${show(b)})`);
+      if (r.guide) assert.ok(!meets(r.guide, b), `${at}: the channel bar (${show(r.guide)}) clears "${name}" (${show(b)})`);
+    }
+    assert.ok(width > 600 ? r.guide : true, `${at}: the channel bar shows on a wide screen`);
+    const s = r.screen, n = r.banner;
+    assert.ok(n.x >= s.x && n.r <= s.r && n.y >= s.y && n.b <= s.b, `${at}: the channel banner (${show(n)}) sits inside the arena (${show(s)})`);
+    if (touch) {
+      // Game mode on a phone: the pad sits on the arena's block, not on the page's copy.
+      const pad = await p.evaluate(() => { const b = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui-pad").getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom }; });
+      for (const [name, b] of r.text) assert.ok(!meets(pad, b), `${at}: the pad (${show(pad)}) clears "${name}" (${show(b)})`);
+      assert.ok(pad.y >= s.b, `${at}: the pad (${show(pad)}) sits under the arena (${show(s)})`);
+    }
+    await p.keyboard.press("Escape");
+    await until(p, () => !document.querySelector("[data-fizlet-host]"));
+    assert.equal(await p.evaluate(() => document.querySelector("main").innerHTML), mainBefore, `${at}: the page is back exactly`);
+    assert.equal(await p.evaluate(() => document.documentElement.getAttribute("style")), null, `${at}: the page's padding is back`);
+    assert.ok(Math.abs((await p.evaluate(() => scrollY)) - y0) <= 1, `${at}: Recall scrolls back to where PLAY was pressed (${y0})`);
+    assert.deepEqual(lay.errors, []);
+    await lay.close();
+  }
+
   // ---------- Phone ----------
   const phone = await open(browser, { width: 390, height: 844, touch: true });
   await phone.page.evaluate(() => (window.game = window.mod.createDomCrossfire({ theme: "light", seed: 7 })).start());
@@ -129,7 +189,7 @@ try {
   await phone.page.evaluate(() => window.game.stop());
   assert.deepEqual(phone.errors, []);
   await phone.close();
-  console.log(`DOM Crossfire (shooter): countdown, moves, pause, the bar drags, touch lock, result, Recall, ${true ? "surrender, " : ""}reduced motion, board page, phone pad.`);
+  console.log(`DOM Crossfire (shooter): countdown, moves, pause, the bar drags, touch lock, result, Recall, ${true ? "surrender, " : ""}reduced motion, board page, layout at 1440, 390 and 360, phone pad.`);
 } finally {
   await browser.close();
 }
