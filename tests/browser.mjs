@@ -133,24 +133,27 @@ try {
     await page.evaluate((ride) => (window.crossfire.ride = ride), ride);
     await page.evaluate(() => window.crossfire.start());
     await page.waitForFunction(() => window.crossfire.state === "play" && window.crossfire.world.crew[0].alive && window.crossfire.world.crew[0].drop >= 1, null, { timeout: 8000 });
-    const shots = () => page.evaluate(() => window.crossfire.world.shells.filter((s) => s.on && !s.foe && s.owner === 0).length);
+    // Trigger pulls, not shells in the air: a shell fired into cover stops the frame it's fired.
+    const shots = () => page.evaluate(() => window.crossfire.world.crew[0].shots);
     const box = await page.locator("#cf").boundingBox();
     await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.45);
+    const s0 = await shots();
     await page.mouse.down();
     await page.waitForTimeout(400);
-    const held = await shots();
+    const held = (await shots()) - s0;
     await page.mouse.up();
-    assert.ok(held > 0, `${ride}: a held click on the field fires right after landing (${held} in flight)`);
+    assert.ok(held > 0, `${ride}: a held click on the field fires right after landing (${held} shots)`);
     const hud = await page.evaluate(() => { const sr = document.querySelector("#cf").shadowRoot, r = sr.querySelector(".hud").getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, pe: getComputedStyle(sr.querySelector(".hud")).pointerEvents, top: sr.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.tagName }; });
     assert.equal(hud.pe, "none", "the scoreboard never takes the pointer");
     assert.equal(hud.top, "CANVAS", "a press on the scoreboard lands on the field");
     await page.waitForTimeout(500);
     await page.mouse.move(hud.x, hud.y);
+    const s1 = await shots();
     await page.mouse.down();
     await page.waitForTimeout(300);
-    const under = await shots();
+    const under = (await shots()) - s1;
     await page.mouse.up();
-    assert.ok(under > 0, `${ride}: a held click under the scoreboard fires (${under} in flight)`);
+    assert.ok(under > 0, `${ride}: a held click under the scoreboard fires (${under} shots)`);
     assert.deepEqual(errors, []);
     await close();
   }

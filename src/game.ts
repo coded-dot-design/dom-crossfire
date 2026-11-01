@@ -126,6 +126,8 @@ interface Unit {
   strikes: number; carpet: number; rail: number; charge: number; chargeT: number; heat: number; hot: number;
   cool: number; kills: number; deaths: number; recoil: number; flash: number; tread: number; run: number;
   gx: number; gy: number; think: number; target: number; xp: number; tier: number; bite: number;
+  /** Trigger pulls so far (a volley counts once): tests read it, since a shell can stop on cover the frame it's fired. */
+  shots: number;
 }
 interface Foe {
   on: boolean; kind: number; sub: number; x: number; y: number; a: number; ta: number; vx: number; vy: number;
@@ -369,7 +371,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const mkUnit = (i: number): Unit => dbl({
     i, kind: 0, name: "", color: "", you: false, x: 0, y: 0, a: -Math.PI / 2, ta: -Math.PI / 2, vx: 0, vy: 0, hp: 0, alive: false, dead: 0.4 + i * 0.5, drop: 0,
     shield: 0, rapid: 0, triple: 0, strikes: 1, carpet: 0, rail: 3, charge: 0, chargeT: -1, heat: 0, hot: 0, cool: 0, kills: 0, deaths: 0,
-    recoil: 0, flash: 0, tread: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, xp: 0, tier: 1, bite: 0,
+    recoil: 0, flash: 0, tread: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, xp: 0, tier: 1, bite: 0, shots: 0,
   }, "x y a ta vx vy hp dead drop shield rapid triple charge heat hot cool recoil flash tread gx gy think xp bite");
   /** You (crew[0]) and your partner (crew[1]). The seam for a second human: pilot() below. */
   const crew: Unit[] = [mkUnit(0), mkUnit(1)];
@@ -645,6 +647,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     return s;
   }
   function fire(u: Unit) {
+    u.shots++;
     if (u.kind === TANK) {
       const len = 24 * scale, spreads = u.triple > 0 ? 3 : 1;
       for (let k = 0; k < spreads; k++) {
