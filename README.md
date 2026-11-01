@@ -24,17 +24,19 @@ and [Fizlet](https://fizlet.com/) · MIT
 | Shreds | aliens, flies, factories | walls, base cores, enemy tanks |
 | Scratches | armour, walls, base cores | the air (half damage) |
 
-**Five waves.** Each brings one game's enemies, and they play the way they do at home:
+**Four sections, then the finale.** Each army is a section of four waves, and they play the way
+they do at home. Every wave in a section brings more of them, faster and tougher, and the fourth
+brings a mini-boss:
 
-| Wave | From | The enemy |
-|---|---|---|
-| 1 | [Swarm Protocol](https://domvirus.com/games/swarm-protocol/) | Bugs walk in from the edges and eat the board's letters into binary. Six letters and they grow; twelve and they hunt you. |
-| 2 | [Null Invaders](https://domvirus.com/games/null-invaders/) | Button factories keep releasing drones, crabs and squids that swoop and drop bolts, until the button breaks. |
-| 3 | [Sherman Bytes](https://domvirus.com/games/sherman-bytes/) | Tank squads roll out of fortified button bases: four walls round a core with a gun. Wreck the button and the base is yours; park in it to repair. |
-| 4 | [Byte Runner](https://domvirus.com/games/byte-runner/) | Flies race food pipes and hop off to chase you (violet straight, pink ahead of you, cyan wherever). A pink power square turns them blue: eat them for 100, 200, 300, 400. |
-| 5 | Crossfire | All four at once. |
+| Section | From | The enemy | Mini-boss |
+|---|---|---|---|
+| 1 | [Swarm Protocol](https://domvirus.com/games/swarm-protocol/) | Bugs walk in from the edges and eat the board's letters into binary. Six letters and they grow; twelve and they hunt you. | The queen |
+| 2 | [Null Invaders](https://domvirus.com/games/null-invaders/) | Button factories keep releasing drones, crabs and squids that swoop and drop bolts, until the button breaks. | The mothership (fans of three bolts) |
+| 3 | [Sherman Bytes](https://domvirus.com/games/sherman-bytes/) | Tank squads roll out of fortified button bases: four walls round a core with a gun. Wreck the button and the base is yours; park in it to repair. | The heavy (three shells a shot) |
+| 4 | [Byte Runner](https://domvirus.com/games/byte-runner/), flipped | Every one of them is a bad guy, the frog too. The pellets on the blocks are their food: a fly that eats one gets tougher and faster (up to three), and the frog grows with every pellet. At four pellets a frog's tongue marks a ride's spot for a beat, then eats whatever is still there. | The big frog (already big) |
+| Finale | Crossfire | All four at once. | |
 
-**DROPS** are your shared reinforcements: four to start, one more for every wave you clear. Go down
+**DROPS** are your shared reinforcements: four to start, one more for every section you clear. Go down
 with none left and it's INSERT COIN. Your partner always comes back. From Blitz: the blinking power
 grid (rapid, triple, shield, health, ammo, airstrike, and mines the plane flies over), supply crates,
 airstrikes (F, then the spot), kill streaks (3: a long shot or salvo, 5: an airstrike, 8: a carpet
@@ -74,7 +76,7 @@ one place a ride's controls come from.
 
 ```sh
 npm ci
-npm run check          # typecheck, build dist/, size budgets (51,200 B gzip each way)
+npm run check          # typecheck, build dist/, size budgets (52,480 B gzip each way)
 npm test               # 0 minor GCs in 20,000 steps; a seed replays its match; each army's rules
 npm run test:settle    # the match keeps pace, pause holds, the hero rests off screen, quiet after the drop-in
 npm run test:browser   # landing, start screen, a match, pause, a win, the drop-in; phones (game mode)

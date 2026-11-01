@@ -30,6 +30,6 @@ const art = await import(pathToFileURL("dist/.art.mjs").href);
 rmSync("dist/.art.mjs");
 // Static files the pages use (icon, shots) ride along in dist/.
 for (const f of readdirSync("site/public", { recursive: true }).map(String)) if (!statSync(`site/public/${f}`).isDirectory()) mkdirSync(dirname(`dist/${f}`), { recursive: true }), copyFileSync(`site/public/${f}`, `dist/${f}`);
-const files = { plane: art.shipSvg(4), tank: art.tankSvg("#39ffb0"), bug: art.bugSvg(3), "bug-1": art.bugSvg(1), "bug-2": art.bugSvg(2), squid: art.alienSvg(2), crab: art.alienSvg(1), drone: art.alienSvg(0), sherman: art.tankSvg("#ff8a1f"), fly: art.flySvg(1), "fly-0": art.flySvg(0), "fly-2": art.flySvg(2), crossfire: art.factionSvg(4) };
+const files = { plane: art.shipSvg(4), tank: art.tankSvg("#39ffb0"), bug: art.bugSvg(3), "bug-1": art.bugSvg(1), "bug-2": art.bugSvg(2), squid: art.alienSvg(2), crab: art.alienSvg(1), drone: art.alienSvg(0), sherman: art.tankSvg("#ff8a1f"), fly: art.flySvg(1), "fly-0": art.flySvg(0), "fly-2": art.flySvg(2), crossfire: art.factionSvg(4), frog: art.frogSvg() };
 for (const [name, svg] of Object.entries(files)) writeFileSync(`dist/art/${name}.svg`, svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ').replace(' aria-hidden="true"', ""));
 console.log(`Built DOM Crossfire ${version}: dist/dom-crossfire.mjs, dist/dom-crossfire.js, dist/site.css, dist/art/ (${Object.keys(files).length} SVGs)`);

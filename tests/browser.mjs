@@ -24,7 +24,7 @@ try {
       play: document.querySelector(".start-key").getAttribute("href"),
     }));
     assert.equal(l.h1, 1, "one h1");
-    assert.deepEqual(l.armies, ["The swarm", "The button factories", "The fortified bases", "The food pipes", "All four at once"]);
+    assert.deepEqual(l.armies, ["The swarm", "The button factories", "The fortified bases", "The frog and its flies", "All four at once"]);
     for (const src of new Set(l.images)) assert.equal(await page.evaluate(async (u) => (await fetch(u)).status, src), 200, `${src} loads`);
     assert.match(l.snippet, /dom-crossfire\.js/);
     assert.ok(l.byline, "by Chris Cooley");
@@ -57,9 +57,9 @@ try {
     await page.waitForFunction(() => window.crossfire.state === "count");
     await page.waitForFunction(() => window.crossfire.state === "play", null, { timeout: 6000 });
     await page.waitForFunction(`${SR}.querySelector("[data-wave] b")?.textContent === "SWARM PROTOCOL"`);
-    assert.match(await text(page, "[data-wave]"), /^WAVE 1 OF 5 SWARM PROTOCOL Bugs eat the letters .* PLANE · .* TANK · /);
-    assert.equal(await text(page, "[data-wv]"), "1/5");
-    assert.equal(await text(page, "[data-wl]"), "SWARM");
+    assert.match(await text(page, "[data-wave]"), /^SECTION 1 · WAVE 1\/4 SWARM PROTOCOL Bugs eat the letters .* PLANE · .* TANK · /);
+    assert.equal(await text(page, "[data-wv]"), "1/4");
+    assert.equal(await text(page, "[data-wl]"), "S1 · SWARM");
     assert.equal(await text(page, "[data-pn]"), "TANK", "the partner's readout is the tank");
     // Fly and fire with the keyboard: you move, your guns shoot.
     await page.waitForFunction(() => window.crossfire.world.crew[0].drop >= 1, null, { timeout: 5000 });
@@ -89,7 +89,7 @@ try {
     await page.waitForFunction(() => window.crossfire.state === "paused");
     await page.evaluate(`${SR}.querySelector("[data-surrender]").click()`);
     await page.waitForFunction(() => window.crossfire.state === "end", null, { timeout: 5000 });
-    assert.match(await text(page, "[data-ov]"), /WHITE FLAG GAME OVER SCORE \d+ WAVES 0 \/ 5 YOU · PLANE .* PARTNER · TANK .* PLAY AGAIN SWAP RIDES/);
+    assert.match(await text(page, "[data-ov]"), /WHITE FLAG GAME OVER SCORE \d+ WAVES 0 \/ 17 YOU · PLANE .* PARTNER · TANK .* PLAY AGAIN SWAP RIDES/);
     await page.evaluate(`${SR}.querySelector("[data-new]").click()`);
     await page.waitForFunction(() => window.crossfire.state === "intro");
     assert.ok(await q(page, "[data-ride=plane]"), "SWAP RIDES goes back to the start screen");
@@ -110,8 +110,7 @@ try {
       g.world.steps(60 * 4); // countdown, then the wave card
       g.world.wave(2);
       g.world.steps(60 * 3);
-      for (const f of g.world.foes) f.on = false;
-      for (const s of g.world.sites) s.hp = 0;
+      g.world.clear();
       g.world.steps(60 * 4); // cleared: the bonus, then the result
       g.engine.advance(1 / 60);
       return { state: g.state, result, score: g.score };
