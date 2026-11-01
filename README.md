@@ -46,6 +46,28 @@ bomb), auto-aim (Q) and aim lock (T), pause with the white flag, light and dark.
 special, F airstrike then click the spot, Q auto-aim, T aim lock, Esc or P pause. Phones: the stick
 bottom left drives; FIRE, AUTO, LOCK, the special and STRIKE sit bottom right (the grab bar moves them).
 
+## Squad play (2 to 4 people)
+
+`/play/squad/`: co-op only. Everyone enters the same invite code and room and picks the plane or the
+tank (mixed squads are fine). The match starts when four are in, or when P1 starts it with two or
+three. A squad of two keeps the AI partner (it takes the ride the two have fewer of); three or four
+play alone. Shared DROPS; no pause in a squad match.
+
+It is Battlefield Blitz's net play: every screen runs the same match from the room's seed in lockstep
+over [`@fzlt/core/presence`](https://github.com/coded-dot-design/fizlet), and only inputs travel
+(one 32-bit word per person per frame: drive, fire, special, airstrike, aim mode, the pointer, the
+ride). The arena is a fixed 1100 × 640, scaled to fit each screen. The room server speaks the
+`fizlet-rooms` protocol; the page uses the same room server URL as Blitz (`data-rooms` on the squad
+page; `?rooms=` overrides it), and Crossfire's rooms 1 to 8 are the server's `/room/8` to `/room/15`.
+Squad play ships as its own module, `dist/dom-crossfire-net.mjs`, so the drop-in and
+`dom-crossfire.mjs` don't carry the lockstep code.
+
+```js
+import { createCrossfire, join } from "./dist/dom-crossfire-net.mjs";
+const { transport, slot, players, seed } = await join("wss://rooms.example/room/8?players=4", undefined, ["fizlet-rooms", "invite.CODE"]);
+createCrossfire(document.querySelector("#arena"), { seed, ride: "tank", net: { transport, slot, players } });
+```
+
 ## Drop-in options
 
 ```html
@@ -76,10 +98,11 @@ one place a ride's controls come from.
 
 ```sh
 npm ci
-npm run check          # typecheck, build dist/, size budgets (52,480 B gzip each way)
+npm run check          # typecheck, build dist/, size budgets (53,760 B gzip solo, 55,424 B squad)
 npm test               # 0 minor GCs in 20,000 steps; a seed replays its match; each army's rules
 npm run test:settle    # the match keeps pace, pause holds, the hero rests off screen, quiet after the drop-in
 npm run test:browser   # landing, start screen, a match, pause, a win, the drop-in; phones (game mode)
+npm run test:squad     # 2-4 people in lockstep (0 desyncs, replays), then four clients on the squad page
 npm run play           # the site on localhost (index.html and play/)
 ```
 

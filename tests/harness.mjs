@@ -13,12 +13,14 @@ export const HOST = `<!doctype html><meta charset="utf-8"><meta name="viewport" 
 
 export const launch = (chromium) => chromium.launch(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {});
 
-/** url: "/" the landing, "/play/" the game page, "/host" the plain page above. */
-export async function open(browser, { url = "/play/", width = 1280, height = 800, touch = false, theme, reduced = "no-preference", init, entry } = {}) {
+/** url: "/" the landing, "/play/" the game page, "/play/squad/" squad play, "/host" the plain page above.
+ *  `before(context)` adds routes before the page loads (tests/rooms.mjs). */
+export async function open(browser, { url = "/play/", width = 1280, height = 800, touch = false, theme, reduced = "no-preference", init, entry, before } = {}) {
   if (!existsSync("dist/dom-crossfire.mjs")) throw Error("Build first: npm run check");
   const ctx = await browser.newContext({ viewport: { width, height }, hasTouch: touch, isMobile: touch, reducedMotion: reduced });
   if (theme) await ctx.addInitScript((t) => localStorage.setItem("dom-virus:theme", t), theme);
   if (init) await ctx.addInitScript(init);
+  if (before) await before(ctx); // more routes first (the stand-in room server)
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (err) => errors.push(err.message));

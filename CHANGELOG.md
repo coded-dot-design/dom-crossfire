@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0
+
+- **Squad play, 2 to 4 people** (`/play/squad/`), co-op only. Each person picks the plane or the
+  tank; mixed squads are fine. A squad of two keeps the AI partner (it takes the ride the two have
+  fewer of); three or four play without it. Shared DROPS; no pause in a squad match.
+- Battlefield Blitz's net play: lockstep over `@fzlt/core/presence` from the room's seed, one 32-bit
+  input word per person per frame (the ride rides in bit 9 through the countdown), a fixed 1100 × 640
+  arena scaled to fit, the match hash compared every 30 frames. Blitz's room card (invite code, your
+  ride, room; four seats; P1's START NOW with two or three in; the squad's rides and kills; someone
+  left). The room server is the same one Blitz uses; Crossfire's rooms are its 8 to 15.
+- A new build, `dist/dom-crossfire-net.mjs` (the module plus squad play): 55,186 B gzip, budget
+  55,424 B. The solo builds carry the seats, the input word and the hash (+1.5 KB, as Blitz's do).
+- Tests: `test:lockstep` (2, 3 and 4 people identical frame for frame, a slow jittered link plays
+  the very same match, the same seed replays it, 0 desyncs, 0 Math.random) and `tests/squad.mjs`
+  (four browsers join one room through the squad page on a stand-in room server and play in lockstep;
+  two with START NOW keep the AI partner). CI runs both.
+
 ## 0.3.0
 
 - **Four waves a section.** Each army is now a section of four waves: more of them each wave, faster
