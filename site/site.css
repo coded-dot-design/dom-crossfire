@@ -1,0 +1,976 @@
+/* DOM Crossfire site (Battlefield Blitz's site styles). The page itself is a Board UI root (<html class="bui">), so every
+   colour, key, sticker and card here is the game's own: vertical hard bases, ink rims, neon faces.
+   This file only adds page furniture (grid, type, panels) on top of board-ui.css (scripts/build.mjs joins them). */
+:root {
+  --sans: Inter, "SF Pro Display", "Segoe UI", system-ui, -apple-system, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --page: 1200px;
+  --gutter: 30px;
+  /* A panel's base: the card colour pushed into the rim, straight below (never to the side). */
+  --base: color-mix(in srgb, var(--k-cmd) 38%, var(--rim));
+  --grid: color-mix(in srgb, var(--k-sys) 9%, transparent);
+}
+html.bui[data-theme="light"] {
+  --base: color-mix(in srgb, var(--k-cmd) 30%, var(--line));
+  --grid: color-mix(in srgb, var(--k-cmd) 9%, transparent);
+}
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 90px;
+  /* Phones: the Board UI kit (.bui) sets touch-action: manipulation and text-size-adjust on the
+     page, and pan-y on [data-touch-lock="y"] surfaces (the hero battle); @fzlt/core/touch's lockTouch
+     (the page script) cancels the pinch on them. Content pages keep pinch-zoom (WCAG 1.4.4). */
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  font: 16px/1.6 var(--sans);
+  color: var(--ink);
+  background: var(--bg);
+  overflow-x: hidden;
+}
+a {
+  color: inherit;
+}
+img,
+svg,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+code,
+kbd,
+pre {
+  font-family: var(--mono);
+}
+code {
+  font-size: 0.88em;
+  color: var(--k-sys-ink);
+}
+:focus-visible {
+  outline: 3px solid var(--k-sys-ink);
+  outline-offset: 3px;
+}
+.wrap {
+  width: 100%;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+.skip {
+  position: absolute;
+  left: 12px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px 14px;
+  background: var(--k-sys);
+  color: var(--rim);
+  font: 700 12px var(--mono);
+  border-radius: 8px;
+}
+.skip:focus {
+  top: 12px;
+}
+
+/* ---------- Type ---------- */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font: 700 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.eyebrow b,
+.eyebrow .index {
+  color: var(--k-sys-ink);
+  font-weight: 800;
+}
+.eyebrow .dot {
+  width: 8px;
+  height: 8px;
+  background: var(--team-a);
+  box-shadow: 0 0 12px var(--team-a);
+}
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+h2 {
+  font-size: clamp(30px, 4.2vw, 50px);
+}
+h3 {
+  font-size: 19px;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+.lead {
+  margin: 0;
+  max-width: 600px;
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.mono-caps {
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ---------- Panels: the game's card. Ink rim, coloured border, a hard base straight below. ---------- */
+.panel {
+  position: relative;
+  background: var(--card);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 6px 0 var(--base);
+}
+.panel.lit {
+  border-color: var(--k-cmd);
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--k-cmd) 55%, var(--rim)), 0 0 28px color-mix(in srgb, var(--k-cmd) 22%, transparent);
+}
+html.bui[data-theme="light"] .panel.lit {
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--k-cmd) 55%, var(--line));
+}
+
+/* ---------- Header ---------- */
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 2px solid var(--line);
+}
+.site-head .wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 76px;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--ink);
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--team-a);
+  background: var(--rim);
+  border: 2px solid color-mix(in srgb, var(--k-sys) 70%, transparent);
+}
+.brand-mark svg {
+  width: 40px;
+  height: 40px;
+}
+.brand-text {
+  display: grid;
+  line-height: 1.05;
+  font-family: var(--mono);
+}
+.brand-text small {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.brand-text small i {
+  margin-left: 8px;
+  font-style: normal;
+  font-size: 9px;
+  color: var(--k-sys-ink);
+  letter-spacing: 0.12em;
+}
+.brand-text b {
+  font-size: 19px;
+  letter-spacing: 0.1em;
+}
+.site-nav {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.site-nav a {
+  padding: 8px 12px;
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--muted);
+  border-radius: 8px;
+}
+.site-nav a:hover,
+.site-nav a[aria-current="page"] {
+  color: var(--ink);
+  background: var(--surface);
+}
+.head-keys {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.head-keys .bui-icon-key {
+  width: 42px;
+  height: 42px;
+}
+.head-keys .bui-icon-key svg {
+  width: 20px;
+  height: 20px;
+}
+.play-key {
+  text-decoration: none;
+}
+@media (max-width: 900px) {
+  .site-nav {
+    display: none;
+  }
+  .head-keys {
+    margin-left: auto;
+  }
+}
+@media (max-width: 380px) {
+  .site-head .wrap {
+    gap: 10px;
+  }
+  .brand-mark {
+    width: 38px;
+    height: 38px;
+  }
+  .brand-mark svg {
+    width: 34px;
+    height: 34px;
+  }
+  .brand-text b {
+    font-size: 16px;
+  }
+  .head-keys {
+    gap: 8px;
+  }
+  .play-key {
+    padding-inline: 10px;
+  }
+}
+@media (max-width: 520px) {
+  :root {
+    --gutter: 18px;
+  }
+  .brand-text small i,
+  .head-keys .gh {
+    display: none;
+  }
+}
+
+/* Theme icon swap. */
+html.bui[data-theme="dark"] .theme-light,
+html.bui[data-theme="light"] .theme-dark {
+  display: none;
+}
+
+/* ---------- Link keys: the kit's arcade key as a link ---------- */
+a.bui-arcade,
+a.bui-sticker-key {
+  text-decoration: none;
+}
+
+/* ---------- Footer: brand, site map (index.html), credit ---------- */
+.site-foot {
+  margin-top: 40px;
+  border-top: 2px solid var(--line);
+  background: var(--surface);
+}
+.foot-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 28px;
+  padding-top: 36px;
+  padding-bottom: 4px;
+}
+.foot-top p {
+  margin: 0;
+  max-width: 420px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.foot-map {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 32px 28px;
+  padding-top: 32px;
+  padding-bottom: 40px;
+}
+.foot-col h2 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--line);
+  font: 700 11px/1.4 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+.foot-col h2 .index {
+  color: var(--k-sys-ink);
+  font-weight: 800;
+}
+.foot-col ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.foot-col a {
+  display: inline-block;
+  padding: 4px 0;
+  color: var(--muted);
+  text-decoration: none;
+}
+.foot-col a:hover {
+  color: var(--k-sys-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.foot-col a[aria-current="page"] {
+  color: var(--k-sys-ink);
+  font-weight: 700;
+}
+.foot-col a[aria-current="page"]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  vertical-align: 0.15em;
+  background: currentColor;
+}
+.foot-col .out {
+  margin-left: 5px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+.foot-base {
+  border-top: 1px solid var(--line);
+}
+.foot-base .wrap {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 16px;
+  padding-bottom: 20px;
+  font: 11px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.foot-legal a,
+.foot-legal button {
+  color: inherit;
+}
+.foot-legal button {
+  min-height: 24px;
+  margin-left: 0.6em;
+  font: inherit;
+  letter-spacing: inherit;
+}
+.foot-legal button::before {
+  content: "· ";
+}
+@media (max-width: 1000px) {
+  .foot-map {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  /* Phones: one column of groups; each group's links two abreast, 32px tall to tap. */
+  .foot-map {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .foot-col ul {
+    grid-template-columns: 1fr 1fr;
+    gap: 0 16px;
+  }
+  .foot-col a {
+    padding: 6px 0;
+  }
+}
+
+/* ---------- START BATTLE: the kit's sticker key (bui-key bui-sticker-key bui-call), page size ----------
+   Skull tile + two-line word on the deep navy face, a white base straight below. This only sizes
+   the key and sets its variables; rest, hover, press, focus and the call ring are the kit's. */
+.bui .start-key {
+  --py: 8px;
+  --hy: 3px;
+  --glow: 0 0 40px color-mix(in srgb, #19f0ff 25%, transparent);
+  --glow-hover: 0 0 56px color-mix(in srgb, #19f0ff 40%, transparent);
+  --glow-press: 0 0 30px color-mix(in srgb, #19f0ff 30%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  width: auto;
+  height: auto;
+  padding: 16px 30px 16px 18px;
+  border-width: 4px;
+  border-radius: 18px;
+}
+.bui .start-key svg {
+  width: 64px;
+  height: 64px;
+  border: 3px solid #19f0ff;
+  background: #0b1830;
+}
+.bui .start-key b {
+  font: 900 30px/1.05 var(--mono);
+  letter-spacing: 0.12em;
+  color: #f6f3ff;
+  text-align: left;
+}
+html.bui[data-theme="light"] .start-key {
+  --edge: var(--ink);
+  --edge-hover: var(--ink);
+  --border-hover: var(--ink);
+  --glow: 0 0 0 transparent;
+  --glow-hover: 0 0 0 transparent;
+  --glow-press: 0 0 0 transparent;
+  color: #19f0ff;
+  background: #10233f;
+  border-color: var(--ink);
+}
+html.bui[data-theme="light"] .start-key b {
+  color: #f6f3ff;
+}
+@media (max-width: 520px) {
+  .bui .start-key {
+    gap: 14px;
+    padding: 12px 22px 12px 12px;
+  }
+  .bui .start-key svg {
+    width: 52px;
+    height: 52px;
+  }
+  .bui .start-key b {
+    font-size: 24px;
+  }
+}
+
+/* ---------- Game mode (the play pages on a phone) ----------
+   A phone is a coarse pointer on a small screen, portrait or landscape: the same query in the game's
+   own CSS (src/game.ts PHONE). Plain CSS, so the first paint is already the game: no header,
+   footer or bar (still in the HTML for search and screen readers), the board fills the dynamic
+   viewport, nothing scrolls. The way out is the exit key in the game's top-left key row. */
+.bui .game-exit {
+  display: none;
+}
+@media (pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px) {
+  html:has(body[data-app]),
+  body[data-app] {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-text-size-adjust: 100%;
+  }
+  body[data-app] :is(.site-head, .site-foot, .skip, .cf-bar) {
+    display: none;
+  }
+  /* Edge to edge: fixed to all four edges (no vh unit, so no 100vh bug under an in-app browser's
+     bars); the game pads its keys by the safe-area insets. */
+  body[data-app] .cf-stage {
+    position: fixed;
+    inset: 0;
+    /* The visible part of the screen (the page script sets these from visualViewport); inset: 0 until then. */
+    top: var(--app-top, 0);
+    bottom: auto;
+    height: var(--app-h, 100%);
+    min-height: 0;
+    border: 0;
+    --bz-lead: 52px; /* the game's keys start after the exit key (src/game.ts .fs, .pz) */
+  }
+  .bui .game-exit {
+    position: fixed;
+    z-index: 50;
+    left: max(12px, env(safe-area-inset-left));
+    top: max(10px, env(safe-area-inset-top));
+    display: inline-grid;
+  }
+}
+
+/* ---------- The play page (play/index.html): the arena fills the screen under the header ---------- */
+.cf-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.cf-stage {
+  position: relative;
+  height: calc(100svh - 78px);
+  min-height: 420px;
+  border-bottom: 2px solid var(--line);
+  background: #090818;
+}
+html.bui[data-theme="light"] .cf-stage {
+  background: #e4e6f7;
+}
+.cf-host {
+  position: absolute;
+  inset: 0;
+}
+.cf-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px 24px;
+  padding-top: 18px;
+  padding-bottom: 6px;
+  font: 12px var(--mono);
+  color: var(--muted);
+}
+.cf-bar p {
+  margin: 0;
+}
+.cf-bar b {
+  color: var(--k-attack);
+}
+.cf-bar a {
+  color: var(--k-sys-ink);
+}
+kbd {
+  padding: 1px 6px;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+/* ---------- The landing (index.html): Battlefield Blitz's landing, made for Crossfire ---------- */
+.cf-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  min-height: min(820px, calc(100svh - 78px));
+  display: grid;
+  align-items: center;
+  border-bottom: 2px solid var(--line);
+  background: var(--bg);
+  /* The copy sits on a scrim that fades from the page colour; the pink line and the tag darken
+     toward --ink in light mode so they keep WCAG AA on the light scrim. */
+  --scrim: var(--bg);
+  --hero-pink: var(--k-attack);
+  --hero-tag: var(--k-sys-ink);
+}
+html.bui[data-theme="light"] .cf-hero {
+  --scrim: var(--surface);
+  --hero-pink: color-mix(in srgb, var(--k-attack) 75%, var(--ink));
+  --hero-tag: color-mix(in srgb, var(--k-sys-ink) 75%, var(--ink));
+}
+.cf-demo {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.85;
+}
+.cf-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--scrim) 93%, transparent) 0%, color-mix(in srgb, var(--scrim) 67%, transparent) 45%, transparent 75%);
+}
+.cf-hero-inner {
+  position: relative;
+  z-index: 1;
+  padding-top: 50px;
+  padding-bottom: 70px;
+  pointer-events: none;
+}
+.cf-hero-inner a,
+.cf-hero-inner button {
+  pointer-events: auto;
+}
+.cf-hero .eyebrow,
+.cf-hero h1 {
+  color: var(--ink);
+}
+.cf-hero .eyebrow {
+  display: block;
+}
+.cf-hero .eyebrow b {
+  color: var(--hero-tag);
+}
+.cf-hero .eyebrow .dot {
+  display: inline-block;
+  margin-right: 10px;
+}
+.cf-hero h1 {
+  margin: 22px 0 20px;
+  font-size: clamp(48px, 8vw, 112px);
+  line-height: 0.95;
+  letter-spacing: -0.05em;
+  text-shadow: 0 4px 30px var(--scrim);
+}
+.cf-hero h1 em {
+  font-style: normal;
+  color: var(--hero-pink);
+}
+.cf-hero .lead {
+  color: var(--muted);
+  max-width: 560px;
+}
+.cf-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 22px 30px;
+  margin-top: 34px;
+}
+.cf-side {
+  display: grid;
+  gap: 14px;
+  justify-items: start;
+}
+.cf-og {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 12px var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-decoration: none;
+}
+.cf-og:hover {
+  color: var(--ink);
+}
+.section {
+  padding: clamp(70px, 10vw, 120px) 0 0;
+}
+.section-head {
+  max-width: 760px;
+  margin-bottom: 40px;
+}
+.section-head .lead {
+  margin-top: 16px;
+}
+.section h2 {
+  margin-top: 14px;
+}
+.section h2 em {
+  font-style: normal;
+  color: var(--k-attack);
+}
+.cf-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 22px;
+}
+.cf-rules li {
+  padding: 22px 20px;
+}
+.cf-rules h3 {
+  margin: 8px 0;
+  font-size: 21px;
+}
+.cf-rules p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.cf-n {
+  float: right;
+  font: 900 26px var(--mono);
+  color: var(--k-attack);
+}
+/* The four armies: one card each, its art on a dark tile in the army's colour. */
+.cf-armies {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.cf-army {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 22px;
+}
+.cf-army h3 {
+  font-size: 24px;
+}
+.cf-army > p:not(.eyebrow, .cf-jobs),
+.cf-all p:not(.eyebrow) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+.cf-army .eyebrow a {
+  color: inherit;
+  text-decoration: none;
+}
+.cf-army .eyebrow a:hover {
+  color: var(--ink);
+}
+.cf-army .eyebrow b {
+  color: var(--fc);
+}
+html.bui[data-theme="light"] .cf-army .eyebrow b {
+  color: color-mix(in srgb, var(--fc) 45%, var(--ink));
+}
+.cf-art {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px;
+  justify-self: start;
+  min-height: 96px;
+  padding: 16px 22px;
+  background: #07060f;
+  border: 2.5px solid var(--fc);
+  border-radius: 12px;
+  box-shadow: 0 5px 0 color-mix(in srgb, var(--fc) 45%, var(--rim)), 0 0 30px color-mix(in srgb, var(--fc) 18%, transparent);
+}
+.cf-art img {
+  image-rendering: pixelated;
+}
+.cf-jobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 0;
+}
+.cf-jobs span {
+  padding: 5px 9px 4px;
+  font: 900 10px/1.2 var(--mono);
+  letter-spacing: 0.1em;
+  color: #07060f;
+  border: 2px solid var(--rim);
+  border-radius: 6px;
+  box-shadow: 0 3px 0 var(--rim);
+}
+.cf-jobs .plane {
+  background: #19f0ff;
+}
+.cf-jobs .tank {
+  background: #39ffb0;
+}
+.cf-all {
+  grid-column: 1 / -1;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 22px 28px;
+}
+.cf-all .cf-art {
+  padding: 12px;
+}
+.cf-all h3 {
+  margin: 8px 0;
+}
+/* Plane or tank: two spec cards. */
+.cf-rides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.cf-ride {
+  padding: 22px 24px 18px;
+  border-color: var(--rc);
+}
+.cf-ride-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+.cf-ride-head .eyebrow b {
+  color: var(--rc);
+}
+html.bui[data-theme="light"] .cf-ride-head .eyebrow b {
+  color: color-mix(in srgb, var(--rc) 45%, var(--ink));
+}
+.cf-ride-head h3 {
+  margin-top: 6px;
+  font-size: 26px;
+}
+.cf-pic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 92px;
+  height: 92px;
+  background: #07060f;
+  border: 2.5px solid var(--rc);
+  border-radius: 14px;
+}
+.cf-pic img {
+  image-rendering: pixelated;
+}
+.cf-ride dl {
+  margin: 0;
+  display: grid;
+}
+.cf-ride dl div {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+}
+.cf-ride dt {
+  font: 700 11px/1.7 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cf-ride dd {
+  margin: 0;
+  font-size: 15px;
+}
+.cf-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: clamp(26px, 5vw, 60px);
+  align-items: center;
+}
+.keys-line {
+  color: var(--muted);
+  font-size: 14px;
+}
+.shot {
+  display: block;
+  margin: 0;
+  overflow: hidden;
+}
+.shot img {
+  width: 100%;
+  height: auto;
+}
+.drop {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 26px;
+}
+#drop {
+  scroll-margin-top: 90px;
+}
+.drop h2 {
+  margin: 0;
+  font-size: clamp(26px, 3vw, 34px);
+}
+.drop p {
+  margin: 0;
+  color: var(--muted);
+}
+.drop pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-size: 12px;
+  background: var(--bg);
+  border: 2px solid var(--line);
+  border-radius: 10px;
+}
+.drop button {
+  justify-self: start;
+  margin-top: 6px;
+}
+.cf-family {
+  display: grid;
+  gap: 16px;
+}
+.cf-version {
+  display: grid;
+  gap: 6px;
+  padding: 20px 22px;
+  text-decoration: none;
+  color: var(--ink);
+  transition: transform 0.12s ease-out;
+}
+.cf-version:hover {
+  transform: translateY(-2px);
+}
+.cf-version b {
+  font-size: 20px;
+}
+.cf-version span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.cf-version em {
+  font: 800 11px var(--mono);
+  font-style: normal;
+  letter-spacing: 0.1em;
+  color: var(--k-sys-ink);
+  text-transform: uppercase;
+}
+.cf-built {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.cf-built a {
+  color: var(--k-sys-ink);
+}
+.brand-mark img {
+  width: 40px;
+  height: 40px;
+}
+@media (max-width: 860px) {
+  .cf-grid,
+  .cf-armies,
+  .cf-rides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cf-all {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .cf-hero::after {
+    background: linear-gradient(180deg, color-mix(in srgb, var(--scrim) 87%, transparent) 0%, color-mix(in srgb, var(--scrim) 67%, transparent) 60%, color-mix(in srgb, var(--scrim) 40%, transparent) 100%);
+  }
+}
+@media (max-width: 520px) {
+  .cf-ride dl div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .cf-art {
+    gap: 12px;
+    padding: 12px 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-version {
+    transition: none;
+  }
+}
