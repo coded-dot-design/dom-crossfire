@@ -1,0 +1,16 @@
+{
+  "id": "dom-crossfire",
+  "author": "Chris Cooley",
+  "license": "MIT",
+  "name": "DOM Crossfire",
+  "kind": "DOM CHANNEL SURF",
+  "tagline": "The virus scrambled the cartridges.",
+  "description": "DOM Crossfire: the virus scrambled the cartridges, a shooter where every 30 seconds the rules channel-surf between five arcade games on one board.",
+  "accent": "violet",
+  "icon": "virus",
+  "controls": [
+    "Arrows / WASD / touch stick — move",
+    "Space / hold the pointer — fire",
+    "P — pause · Esc — give the page back"
+  ]
+}

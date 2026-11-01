@@ -1,0 +1,709 @@
+/**
+ * @fzlt/core/arcade: the shell every page arcade game repeats, so a game is only its rules and its art.
+ * One engine per run over the host page (`@fzlt/core/board-page`: its words are terrain, its buttons are
+ * targets), a fixed overlay with a canvas and a scoreboard in the Board UI kit (title, sound, pause,
+ * fold and exit keys, readouts, an optional meter, action keys, a comms toast), keys and pointer
+ * (`@fzlt/core/input`), the touch pad on coarse pointers (`@fzlt/core/pad`), sound from the event ring
+ * (`@fzlt/core/sound`), sparks and stacking score popups, factory health painted into the buttons, and
+ * a controller a hub drives: start, pause, resume, stop, destroy, getSnapshot. While a run is live,
+ * a click on the page fires instead of following a link; the scoreboard, fields and
+ * `[data-virus-ignore]` / `[data-fizlet-ignore]` keep their clicks. Recall (Escape, the exit key,
+ * stop) destroys the engine, so every letter and button comes back exactly; a run that ends keeps
+ * the scoreboard with the result until Recall. The game supplies `create(ctx)`: its own systems on
+ * `ctx.engine`, reading `ctx.ctl` (written in the read phase) and drawing in render.
+ *
+ * The scoreboard and controls are a HUD preset, chosen per game with `hud` (BOARD-UI.md §19):
+ * `arcadeHud()` is today's card and the default (no `hud` renders it byte for byte);
+ * `skirmishHud({...})` is Battlefield Blitz's top bar with a clock, rank and armor bar, a feed, a
+ * banner, aim toggles and counted keys, and its flow (countdown, pause / surrender, result) on
+ * `@fzlt/core/match`: then match owns the phase, the shell asks it to pause, resume or end and follows
+ * it (`HudView.ask`, `HudRun.go`). Each preset is its own export, so a game ships only the one it names.
+ */
+import { createEngine } from "./kernel/engine";
+import type { Engine, System } from "./kernel/engine";
+import type { FizEvent } from "./kernel/ring";
+import { boardPage } from "./board-page";
+import type { BoardPage } from "./board-page";
+import { controls } from "./input";
+import type { Controls } from "./input";
+import { pad } from "./pad";
+import type { PadAction } from "./pad";
+import { sound } from "./sound";
+import type { Cue } from "./sound";
+import { mount, readouts, toast } from "./ui/board-ui";
+import { BASE, ICON, drag, esc } from "./arcade-parts";
+import { lockTouch } from "./touch";
+export { skirmishHud } from "./arcade-skirmish";
+export type { SkirmishOptions, SkirmishReadout } from "./arcade-skirmish";
+
+/** Controls and view, written once per frame in the read phase (a step reads them): mode (0 keys or
+ *  stick, 1 pointer), pointer x, y and on, move x, y (-1..1), fire, viewport width and height, and
+ *  reduced motion (1/0). The game writes TARGET_HP: the full health of a target, for its paint. */
+export const MODE = 0, PX = 1, PY = 2, PON = 3, KX = 4, KY = 5, FIRE = 6, VW = 7, VH = 8, CALM = 9, TARGET_HP = 10;
+
+/** One action key: the intent it drives, its keyboard code and its scoreboard text. */
+export interface ArcadeAction {
+  /** The controls intent: `ctx.input.hit(id)` in a step. */
+  id: string;
+  /** KeyboardEvent.code, e.g. "KeyB". */
+  key: string;
+  /** Scoreboard key text, e.g. "B · Cover". */
+  label: string;
+}
+/** Where a run is: idle, running, paused, won, game over or destroyed. */
+export type ArcadeStatus = "idle" | "running" | "paused" | "won" | "gameover" | "destroyed";
+/** Options for `arcade()`: the board and its selectors, theme, seed, reduced motion, sound and
+ *  controls, and the `onState` / `onEvent` / `onError` hooks. */
+export interface ArcadeOptions<S> {
+  /** The board: a selector or an element (default document.body). */
+  root?: string | Element;
+  textSelector?: string;
+  targetSelector?: string;
+  excludeSelector?: string;
+  /** "system" (default) follows the visitor's colour scheme. */
+  theme?: "dark" | "light" | "system";
+  seed?: number;
+  reducedMotion?: boolean;
+  /** Start with sound on (default true; it waits for a gesture to unlock). */
+  sound?: boolean;
+  /** "keyboard": the mouse never steers. */
+  controls?: "mouse" | "keyboard";
+  onState?: (state: ArcadeSnapshot<S>) => void;
+  onEvent?: (event: { type: string; game: string; [key: string]: unknown }) => void;
+  onError?: (error: unknown) => void;
+}
+/** What the controller reports about a run: its status, time and frame cost, plus the game's own state. */
+export type ArcadeSnapshot<S> = Partial<S> & {
+  id: string;
+  status: ArcadeStatus;
+  elapsed: number;
+  frameMs: number;
+  maxFrameMs: number;
+  notice: string;
+  /** Letters indexed, on screen and spent, and the range reads the last measurement made. */
+  board?: { indexed: number; visible: number; spent: number; measurements: number };
+  /** Sparks alive (at most 100). */
+  particles?: number;
+};
+/** The controller `arcade()` returns: start, pause, resume, stop and destroy a run, and read its snapshot. */
+export interface ArcadeController<S> {
+  start(): ArcadeSnapshot<S>;
+  pause(): void;
+  resume(): void;
+  stop(): void;
+  destroy(): void;
+  getSnapshot(): ArcadeSnapshot<S>;
+}
+/** What `create` gets: the run's engine and board, the controls, and the shell's presentation. */
+export interface ArcadeContext {
+  engine: Engine;
+  board: BoardPage;
+  input: Controls;
+  /** MODE … TARGET_HP (see the constants). */
+  ctl: Float64Array;
+  reduced(): boolean;
+  /** A popup at (x, y): `+value` when `text` is null (stacked with nearby ones), else the text.
+   *  Tone 0 score, 1 accent (upgrade), 2 hurt. Call it from render (react). */
+  popup(x: number, y: number, value: number, text: string | null, tone?: 0 | 1 | 2): void;
+  /** n sparks from (x, y) in colour `c` (an index into `colors`); none under reduced motion. */
+  spark(x: number, y: number, n: number, c: number): void;
+  /** A line in the comms toast. */
+  say(text: string, ms?: number): void;
+  /** onEvent for the hub (a plain object: call it from render, not a step). */
+  emit(type: string, data?: Record<string, unknown>): void;
+  /** In-page art: a shadow root in an overlay inside `el` (an absolutely positioned host that
+   *  follows the page's layout, scrolling and transforms natively). A static `el` becomes
+   *  relative. Through the ledger: Recall removes it and puts the style back. Call from create
+   *  or reset (it reads computed style), never from a step. Null for replaced elements. */
+  attach(el: Element): ShadowRoot | null;
+}
+/** One run of your game, as the shell drives it: reset, draw, the HUD and meter, page scroll,
+ *  reactions to events, stats, and whether the run is over. */
+export interface ArcadeGame<S> {
+  /** A fresh run (the viewport is in ctl[VW], ctl[VH]). */
+  reset(): void;
+  /** 0 playing, 1 lost, 2 won: read every render; the run ends the frame it turns non-zero. */
+  over(): number;
+  /** The page scrolled by (dx, dy): move page-space things (read phase). */
+  scroll?(dx: number, dy: number): void;
+  /** Each event on the ring this frame (render): popups, sparks, the toast, onEvent. */
+  react?(ev: FizEvent): void;
+  /** Draw on the canvas (render), after the target beacons, before sparks and popups. */
+  draw(ctx: CanvasRenderingContext2D, dt: number): void;
+  /** The readout values, in `readouts` order, then the meter's change key (render, change-only). */
+  hud(out: Float64Array): void;
+  /** The meter's left text, right text and fill 0..1, when its change key moved. */
+  meter?(): readonly [string, string, number];
+  /** The snapshot's game fields (not a hot path). */
+  stats(): S;
+}
+/** Your game for `arcade()`: its id, title, accent, hint, CSS, actions, readouts, sound cues and
+ *  `create()`, which makes a run. */
+export interface ArcadeDef<S> {
+  id: string;
+  title: string;
+  /** The game's accent (hex): title, meter, popups, target paint at full health. */
+  color: string;
+  hint: string;
+  touchHint?: string;
+  /** The Board UI kit CSS text (the game bakes in the sections it uses). */
+  css: string;
+  /** Hold Space / the pointer to fire; a Fire key on the touch pad and an Auto fire key. */
+  fire?: boolean;
+  actions?: ArcadeAction[];
+  /** Touch move control (default "stick"; "dpad" for grid games). */
+  pad?: "stick" | "dpad";
+  /** Keys (or the stick) only: the mouse never steers. */
+  keyboard?: boolean;
+  /** The card's readouts: label, tone, how the value shows, and whether it hides when the board is
+   *  folded. A preset with its own readouts (skirmish) leaves this out. */
+  readouts?: [label: string, tone?: "team" | "enemy" | undefined, fmt?: ((v: number) => string) | undefined, fold?: boolean | undefined][];
+  meter?: { label: string };
+  /** Spark colours, by index. */
+  colors: string[];
+  /** Event type → sound cue. */
+  cues: Record<string, Cue>;
+  /** Paint targets with their health (default true). */
+  paint?: boolean;
+  /** The scoreboard and controls: a HUD preset (default `arcadeHud()`, today's card). */
+  hud?: ArcadeHud;
+  create(ctx: ArcadeContext): ArcadeGame<S>;
+}
+
+/** A HUD preset: its CSS (after the game's kit CSS) and a mount, once per run. */
+export interface ArcadeHud {
+  css: string;
+  /** Extra controls intents the HUD drives (e.g. aim toggles): intent → key codes. */
+  keys?: Record<string, string[]>;
+  mount(run: HudRun): HudView;
+}
+/** What the shell gives a HUD when a run starts. */
+export interface HudRun {
+  /** The kit root (`.bui`), the canvas already in it. */
+  ui: HTMLElement;
+  def: ArcadeDef<any>;
+  engine: Engine;
+  input: Controls;
+  /** A coarse pointer: build the touch pad. */
+  coarse: boolean;
+  /** The game, once `create` returned: read it in `write`, never in `mount`. */
+  game: ArcadeGame<any>;
+  /** Sound (a scoreboard key flips `on`). */
+  sfx: { on: boolean };
+  /** Aborts at Recall: the overlay's life. */
+  signal: AbortSignal;
+  status(): ArcadeStatus;
+  /** Moves the run, for a HUD that owns its flow (`ask`), once its phase changed: pause, resume,
+   *  the end (won, lost), a rematch (restart) or Recall (exit). */
+  go(to: ArcadeFlow | "restart" | "exit"): void;
+}
+/** A change in a run's flow the HUD is told about: paused, resumed, won or lost. */
+export type ArcadeFlow = "pause" | "resume" | "won" | "lost";
+/** A mounted HUD. Keys are `button[data-a]` (sound, pause, exit, restart, gate, auto, fold, or the
+ *  HUD's own) and `button[data-act]` (an action): the shell runs them, then calls `key`. */
+export interface HudView {
+  /** The comms toast. */
+  msg: HTMLElement;
+  /** Every render and once at start: change-only writes, nothing allocated in the steady state. */
+  write(): void;
+  /** The status changed: the pause key, overlays. */
+  sync(): void;
+  /** A scoreboard key ran: repaint its face (`auto`: auto fire is on). */
+  key(a: string, b: HTMLElement, auto: boolean): void;
+  /** At start, in place of starting the engine: a countdown that calls `go` when it is done. */
+  begin?(go: () => void): void;
+  /** Before the engine goes at the end of a run (its ledger takes back what went through it). */
+  hold?(): void;
+  /** The run ended and the page is back: show the result. */
+  end(won: boolean, notice: string, stats: Record<string, unknown>): void;
+  /** The HUD owns the phase (skirmish: `@fzlt/core/match`): the shell's pause, resume and end are asked of
+   *  it, and it answers with `HudRun.go` (one owner; the shell keeps the keys and delegates). */
+  ask?(to: ArcadeFlow): void;
+}
+
+const EDIT = 'input,textarea,select,[contenteditable],form,dialog,[role="dialog"]';
+const PROTECTED = "[data-virus-ignore],[data-fizlet-ignore]";
+// The card (the `arcade` preset): bottom right, folded to the top on phones.
+const CARD = `
+.ar{position:absolute;right:max(12px,env(safe-area-inset-right));bottom:max(12px,env(safe-area-inset-bottom));width:min(300px,calc(100% - 24px));display:grid;gap:10px;padding:10px 12px 12px;pointer-events:auto;color:var(--ink);background:color-mix(in srgb,var(--card) 94%,transparent);border:2.5px solid var(--line);border-radius:10px;box-shadow:calc(5px*var(--bui-sx)) calc(5px*var(--bui-sy)) 0 var(--bui-shadow)}
+.ar header{display:flex;align-items:center;gap:6px}.ar header b{flex:1;font:900 11px/1 ui-monospace,monospace;letter-spacing:.14em;color:var(--team-a)}
+.ar header button{width:34px;height:34px;min-height:0;padding:0;display:grid;place-items:center}.ar header svg{width:18px;height:18px}
+.ar .bui-readouts{justify-content:space-between;gap:12px}
+.mt{display:grid;grid-template-columns:1fr auto;gap:4px 8px;font-size:10px;letter-spacing:.08em;color:var(--muted)}.mt b{color:var(--ink)}
+.mt i{grid-column:1/-1;height:6px;border-radius:3px;background:var(--surface);border:1.5px solid var(--line);overflow:hidden}.mt u{display:block;height:100%;width:0;background:var(--team-a)}
+.ar nav{display:flex;flex-wrap:wrap;gap:6px}.ar nav button{flex:1 1 auto;white-space:nowrap;min-height:0;padding:7px 6px;font:800 10px/1 ui-monospace,monospace;letter-spacing:.08em}.ar nav:empty{display:none}
+.ar.compact .mt,.ar.compact nav,.ar.compact [data-fold]{display:none}
+@media (pointer:coarse),(max-width:600px){.ar{top:max(10px,env(safe-area-inset-top));bottom:auto;width:min(260px,calc(100% - 20px))}.bui .msg{bottom:auto;top:max(150px,calc(env(safe-area-inset-top) + 140px))}}`;
+const HEAD = {
+  sound: `<button type="button" data-a="sound" aria-pressed="true" aria-label="Mute game sound">${ICON.sound}</button>`,
+  pause: `<button type="button" data-a="pause" aria-label="Pause game (P)">${ICON.pause}</button>`,
+  fold: `<button type="button" data-a="fold" aria-expanded="true" aria-label="Minimize scoreboard">${ICON.fold}</button>`,
+  exit: `<button type="button" data-a="exit" aria-label="Close game and restore page (Esc)">${ICON.exit}</button>`,
+};
+/** Options for the default HUD: which header keys and which nav keys, in order. */
+export interface ArcadeHudOptions {
+  /** Header keys, in order (default all four). */
+  header?: ("sound" | "pause" | "fold" | "exit")[];
+  /** The nav row after the action keys (default all three; `auto` needs `fire`). */
+  nav?: ("next" | "restart" | "auto")[];
+}
+
+/**
+ * The `arcade` preset, the default: one card with the title, sound / pause / fold / exit keys,
+ * the readouts, one meter, the nav row (actions, Next gate, Restart, Auto fire) and the toast;
+ * phones get the pad and the card folded at the top. `arcadeHud()` renders exactly what leaving
+ * `hud` out renders. Values: `hud(out)` fills the readouts in order, then the meter's change key.
+ */
+export function arcadeHud(o: ArcadeHudOptions = {}): ArcadeHud {
+  return {
+    css: CARD,
+    mount(r) {
+      const { ui, def, coarse } = r, R = def.readouts ?? [], actions = def.actions ?? [];
+      const nav = o.nav ?? ["next", "restart", "auto"];
+      ui.insertAdjacentHTML("beforeend", `<section class="ar" aria-label="${esc(def.title)} controls"><header><b>${esc(def.title.toUpperCase())}</b>${(o.header ?? ["sound", "pause", "fold", "exit"]).map((k) => "\n" + HEAD[k]).join("")}</header>
+${def.meter ? `<div class="mt"><b></b><span></span><i role="progressbar" aria-label="${esc(def.meter.label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><u></u></i></div>` : ""}
+<nav>${actions.map((a) => `<button type="button" data-act="${esc(a.id)}">${esc(a.label)}</button>`).join("")}${nav.includes("next") ? '<button type="button" data-a="gate">Next gate</button>' : ""}${nav.includes("restart") ? '<button type="button" data-a="restart">Restart</button>' : ""}${def.fire && nav.includes("auto") ? '<button type="button" data-a="auto" aria-pressed="false">Auto fire</button>' : ""}</nav></section>
+<div class="bui-toast msg" role="status" hidden></div>`);
+      const $ = <T extends Element>(s: string) => ui.querySelector<T>(s);
+      const panel = $<HTMLElement>(".ar")!, msg = $<HTMLElement>(".msg")!, meter = $<HTMLElement>(".mt");
+      const { group, values } = readouts(panel, R.map(([l, t]) => (t ? [l, t] : [l])) as [string, ("team" | "enemy")?][]);
+      panel.insertBefore(group, meter ?? $("nav"));
+      R.forEach(([, , , fold], i) => fold && group.children[i]!.setAttribute("data-fold", ""));
+      if (coarse) {
+        // Without fire, the first action is the big primary key.
+        const pads: PadAction[] = actions.map((a, i) => ({ intent: a.id, label: a.label.replace(/^[^·]*· /, ""), role: !def.fire && !i ? "go" : "sys" }));
+        if (def.fire) pads.unshift({ intent: "fire", label: "", name: "Hold to fire (Space)", icon: ICON.fire, hold: true, role: "fire" });
+        pad(r.engine, r.input, { scheme: def.pad ?? "stick", host: ui, actions: pads });
+      }
+      const k = { sound: $<HTMLButtonElement>("[data-a=sound]"), pause: $<HTMLButtonElement>("[data-a=pause]"), fold: $<HTMLButtonElement>("[data-a=fold]") };
+      const fold = (compact: boolean) => {
+        panel.classList.toggle("compact", compact);
+        k.fold!.innerHTML = compact ? ICON.open : ICON.fold;
+        k.fold!.setAttribute("aria-expanded", String(!compact));
+        k.fold!.setAttribute("aria-label", compact ? "Expand scoreboard" : "Minimize scoreboard");
+      };
+      if (k.fold) fold(coarse || innerWidth <= 600);
+      const syncSound = () => {
+        if (!k.sound) return;
+        k.sound.innerHTML = r.sfx.on ? ICON.sound : ICON.mute;
+        k.sound.setAttribute("aria-pressed", String(r.sfx.on));
+        k.sound.setAttribute("aria-label", r.sfx.on ? "Mute game sound" : "Turn game sound on");
+      };
+      const sync = () => {
+        const s = r.status();
+        if (!k.pause) return;
+        k.pause.innerHTML = s === "paused" ? ICON.play : ICON.pause;
+        k.pause.setAttribute("aria-label", s === "paused" ? "Resume game (P)" : "Pause game (P)");
+        k.pause.disabled = s !== "running" && s !== "paused";
+      };
+      syncSound();
+      // Change-only writes.
+      const N = R.length, hv = new Float64Array(N + 1), shown = new Float64Array(N + 1).fill(NaN);
+      return {
+        msg,
+        sync,
+        write() {
+          const game = r.game;
+          game.hud(hv);
+          for (let i = 0; i < N; i++)
+            if (hv[i] !== shown[i]) {
+              const fmt = R[i]![2];
+              values[i]!.textContent = fmt ? fmt(hv[i]!) : String(hv[i]);
+              shown[i] = hv[i]!;
+            }
+          if (meter && game.meter && hv[N] !== shown[N]) {
+            shown[N] = hv[N]!;
+            const [l, rt, f] = game.meter(), pct = Math.round(Math.min(1, Math.max(0, f)) * 100);
+            meter.children[0]!.textContent = l;
+            meter.children[1]!.textContent = rt;
+            (meter.querySelector("u") as HTMLElement).style.width = `${pct}%`;
+            meter.children[2]!.setAttribute("aria-valuenow", String(pct));
+          }
+        },
+        key(a, b, auto) {
+          if (a === "sound") syncSound();
+          else if (a === "fold") fold(!panel.classList.contains("compact"));
+          else if (a === "auto") b.setAttribute("aria-pressed", String(auto)), (b.textContent = auto ? "Fire: on" : "Auto fire");
+        },
+        end(won, notice) {
+          panel.classList.remove("compact");
+          sync();
+          toast(msg, `${won ? "STAGE CLEAR" : "GAME OVER"} · ${notice}`, 1e9);
+        },
+      };
+    },
+  };
+}
+
+/** The shell every page arcade game repeats: one engine per run over the host page (its words are
+ *  terrain, its buttons targets), a Board UI overlay with a canvas and scoreboard, input, sound and
+ *  the run's flow. `def` is only the game's rules and art. */
+export function arcade<S>(def: ArcadeDef<S>, options: ArcadeOptions<S> = {}): ArcadeController<S> {
+  let status: ArcadeStatus = "idle", destroyed = false, notice = "";
+  let run: ReturnType<typeof begin> | null = null;
+  let last: Record<string, unknown> = {};
+  const motion = typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+  const reduced = () => options.reducedMotion ?? !!motion?.matches;
+  const emit = (type: string, data: Record<string, unknown> = {}) => options.onEvent?.({ ...data, type, game: def.id });
+  const keyboard = def.keyboard || options.controls === "keyboard";
+  const actions = def.actions ?? [];
+
+  function getSnapshot(): ArcadeSnapshot<S> {
+    const e = run?.engine, ms = e?.stats().frameMs;
+    return { id: def.id, status, elapsed: e?.time ?? 0, ...(run?.stats() ?? last), frameMs: ms?.avg ?? 0, maxFrameMs: ms?.max ?? 0, notice } as ArcadeSnapshot<S>;
+  }
+  const notify = () => options.onState?.(getSnapshot());
+
+  // ---------- One run: an engine, the page as the board, the overlay ----------
+  function begin() {
+    const doc = document;
+    const host = doc.createElement("div");
+    host.dataset.domVirusRoot = def.id;
+    host.dataset.virusIgnore = "";
+    host.setAttribute("data-fizlet-host", def.id);
+    const theme = options.theme === "dark" || options.theme === "light" ? options.theme : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    const preset = def.hud ?? arcadeHud();
+    const ui = mount(host, def.css + BASE + preset.css, { theme, palette: { teamA: def.color } });
+    ui.innerHTML = `<canvas aria-hidden="true"></canvas>\n`;
+    const canvas = ui.firstChild as HTMLCanvasElement, c2d = canvas.getContext("2d")!;
+    // The overlay is the one page change outside the engine's ledger: the scoreboard outlives the
+    // engine when a run ends (the page is already back), and the controller removes it on Recall.
+    doc.documentElement.append(host);
+    // The run's own keys (Escape, P, G) live as long as the overlay, not the engine.
+    const life = new AbortController();
+    let built: Engine | undefined;
+    try {
+      const e = (built = createEngine({
+        root: host,
+        seed: options.seed ?? (Math.random() * 2 ** 31) | 0,
+        events: 256,
+        pause: { offscreen: false },
+        onError(err) {
+          stop();
+          notice = "The game stopped safely after an error.";
+          notify();
+          options.onError?.(err);
+        },
+      }));
+      const board = boardPage(e, {
+        root: (typeof options.root === "string" ? doc.querySelector(options.root) : options.root) ?? doc.body,
+        // Fizlet's defaults plus the DOM VIRUS hooks pages already carry.
+        text: options.textSelector ?? "h1,h2,h3,h4,h5,h6,p,li,blockquote,[data-fizlet-text],[data-virus-text]",
+        targets: options.targetSelector ?? "button,[role=button],a.button,a.btn,[data-fizlet-target],[data-virus-target]",
+        exclude: [PROTECTED, options.excludeSelector].filter(Boolean).join(","),
+        color: def.color,
+      });
+      const keys: Record<string, string[]> = { up: ["KeyW", "ArrowUp"], down: ["KeyS", "ArrowDown"], left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"] };
+      if (def.fire) keys.fire = ["Space"];
+      for (const a of actions) keys[a.id] = [a.key];
+      Object.assign(keys, preset.keys);
+      const input = controls(e, { keys, target: host });
+      const sfx = sound(e, { on: options.sound !== false, cues: def.cues });
+      const r: HudRun = { ui, def, engine: e, input, coarse: matchMedia("(pointer: coarse)").matches, game: null!, sfx, signal: life.signal, status: () => status, go };
+      const hud = preset.mount(r);
+      drag(ui.querySelector<HTMLElement>(":scope>section")!, life.signal); // every preset's panel drags
+      const ctl = new Float64Array(11);
+
+      // Sparks (3 px squares, a pool of 100) and popups (24, stacked when they land close together).
+      const SN = 100, kx = new Float64Array(SN), ky = new Float64Array(SN), kvx = new Float64Array(SN), kvy = new Float64Array(SN), kl = new Float64Array(SN), kc = new Uint8Array(SN);
+      const PN = 24, px = new Float64Array(PN), py = new Float64Array(PN), pl = new Float64Array(PN), pv = new Float64Array(PN), pc = new Uint8Array(PN), pt: (string | null)[] = new Array(PN).fill(null);
+      const plus: string[] = [], label = (v: number) => plus[v] ?? (plus[v] = `+${v}`);
+      const TONE = ["#4bce82", def.color, "#f4457a"];
+      const context: ArcadeContext = {
+        engine: e, board, input, ctl, reduced,
+        popup(x, y, value, text, tone = 0) {
+          if (text === null)
+            for (let i = 0; i < PN; i++)
+              if (pl[i]! > 0.65 && pt[i] === null && pc[i] === tone && Math.abs(px[i]! - x) < 28 && Math.abs(py[i]! - (y - 12)) < 28) return void ((pv[i]! += value), (pl[i] = 1.1));
+          let k = 0;
+          for (let i = 1; i < PN; i++) if (pl[i]! < pl[k]!) k = i;
+          px[k] = x; py[k] = y - 12; pl[k] = 1.1; pv[k] = value; pt[k] = text; pc[k] = tone;
+        },
+        spark(x, y, n, c) {
+          if (reduced()) return;
+          for (let i = 0; i < SN && n > 0; i++) {
+            if (kl[i]! > 0) continue;
+            const a = Math.random() * 6.2832, v = 30 + Math.random() * 100;
+            kx[i] = x; ky[i] = y; kvx[i] = Math.cos(a) * v; kvy[i] = Math.sin(a) * v; kl[i] = 0.3 + Math.random() * 0.3; kc[i] = c;
+            n--;
+          }
+        },
+        say: (text, ms) => toast(hud.msg, text, ms),
+        emit,
+        attach(el) {
+          if (!(el instanceof HTMLElement) || /^(IMG|INPUT|BR|HR|CANVAS|VIDEO|IFRAME|TEXTAREA|SELECT)$/.test(el.tagName)) return null;
+          if (getComputedStyle(el).position === "static") e.ledger.style(el, "position", "relative", "important");
+          const art = e.ledger.add(doc.createElement("div"));
+          art.setAttribute("data-fizlet-host", `${def.id}-art`);
+          art.setAttribute("aria-hidden", "true");
+          art.style.cssText = "all:initial!important;position:absolute!important;inset:0!important;display:block!important;border-radius:inherit!important;pointer-events:none!important;user-select:none!important";
+          el.append(art);
+          return art.attachShadow({ mode: "open" });
+        },
+      };
+      const game = (r.game = def.create(context));
+
+      // Pointer, fire and the page's own clicks: while running, a click on the page fires instead
+      // of following a link or pressing a button. The HUD, fields and opted-out parts keep theirs.
+      const p = new Float64Array(6), P_X = 0, P_Y = 1, P_ON = 2, P_DOWN = 3, SX = 4, SY = 5;
+      let mode = keyboard ? 0 : 1, auto = false, jump = 0, ending = 0;
+      const live = () => status === "running";
+      const guarded = (ev: Event) => ev.composedPath().some((n) => n === host || (n instanceof Element && n.matches(`${EDIT},${PROTECTED}`)));
+      const on = { signal: e.signal, capture: true } as const;
+      // The page is the board (the host is a full-screen overlay): for the run, no pinch, iOS gesture
+      // or double-tap zooms or pans it; the engine's end gives the page its gestures back.
+      e.signal.addEventListener("abort", lockTouch(doc, null));
+      e.ledger.style(doc.documentElement, "touch-action", "manipulation");
+      doc.addEventListener("pointermove", (ev) => {
+        if (!live() || ev.pointerType === "touch" || keyboard || guarded(ev)) return;
+        p[P_X] = ev.clientX; p[P_Y] = ev.clientY; p[P_ON] = 1; mode = 1;
+      }, { ...on, passive: true });
+      doc.addEventListener("pointerdown", (ev) => {
+        if (!live() || ev.button !== 0 || guarded(ev) || !def.fire) return;
+        p[P_DOWN] = 1;
+        ev.preventDefault();
+      }, on);
+      const up = () => (p[P_DOWN] = 0);
+      doc.addEventListener("pointerup", up, on);
+      doc.addEventListener("pointercancel", up, on);
+      addEventListener("blur", up, { signal: e.signal });
+      doc.addEventListener("click", (ev) => {
+        if (live() && ev.detail > 0 && !guarded(ev)) (ev.preventDefault(), ev.stopPropagation());
+      }, on);
+      doc.addEventListener("keydown", (ev) => {
+        if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
+        const t = ev.target;
+        if (t instanceof Element && t.closest(EDIT)) return;
+        if (ev.code === "Escape") return ev.preventDefault(), stop();
+        if (/^(Arrow(Up|Down|Left|Right)|Key[WASD])$/.test(ev.code)) mode = 0;
+        if (ev.repeat || (t instanceof Element && t.closest(PROTECTED) && !host.contains(t))) return;
+        if (ev.code === "KeyP") ev.preventDefault(), status === "paused" ? resume() : pause();
+        else if (ev.code === "KeyG" && live()) ev.preventDefault(), (jump = 1);
+      }, { signal: life.signal, capture: true });
+
+      // ---------- Scoreboard keys: the shell runs them, the HUD repaints their faces ----------
+      ui.addEventListener("click", (ev) => {
+        const b = (ev.target as Element).closest<HTMLButtonElement>("button[data-a],button[data-act]");
+        if (!b) return;
+        const a = b.dataset.a!;
+        if (b.dataset.act) live() && input.press(b.dataset.act), live() && input.press(b.dataset.act, false);
+        else if (a === "sound") sfx.on = !sfx.on;
+        else if (a === "pause") status === "paused" ? resume() : pause();
+        else if (a === "exit") stop();
+        else if (a === "restart") start();
+        else if (a === "gate") live() && (jump = 1);
+        else if (a === "auto") auto = !auto;
+        hud.key(a, b, auto);
+        if (live()) b.blur();
+      });
+
+      // G / Next gate: scroll to a live target, preferring one off screen (a page write: render).
+      function gate() {
+        let pick: (typeof board.targets)[number] | undefined;
+        for (const t of board.targets) if (t.hp > 0 && (!pick || (pick.w > 0 && !(t.w > 0)))) pick = t;
+        pick?.el.scrollIntoView({ behavior: "instant", block: "center" });
+        emit("jump");
+      }
+      // Targets: a level of the accent (then yellow, then red) inside the button, through the ledger.
+      const signal = (fill: number) => (fill > 60 ? def.color : fill > 25 ? "#cdde00" : "#ee6875");
+      const painted = new Map<Element, number>();
+      function paint() {
+        const max = ctl[TARGET_HP]! || 100;
+        for (const t of board.targets) {
+          const fill = Math.round((Math.min(t.hp, max) / max) * 100);
+          if (painted.get(t.el) === fill) continue;
+          painted.set(t.el, fill);
+          const c = signal(fill);
+          e.ledger.style(t.el as HTMLElement, "background", `linear-gradient(to top,${c} 0%,${c} ${fill}%,transparent ${fill}%,transparent 100%)`, "important");
+        }
+      }
+
+      const view = new Float64Array(3), DPR = 0, NOTE = 1;
+      const shell: System = {
+        read() {
+          // Size and scroll, once a frame (the read phase is the only place that touches layout).
+          if (ctl[VW] !== innerWidth || ctl[VH] !== innerHeight) {
+            ctl[VW] = innerWidth;
+            ctl[VH] = innerHeight;
+            view[DPR] = Math.min(devicePixelRatio || 1, 1.5);
+            canvas.width = Math.round(innerWidth * view[DPR]!);
+            canvas.height = Math.round(innerHeight * view[DPR]!);
+          }
+          const dx = scrollX - p[SX]!, dy = scrollY - p[SY]!;
+          if (dx || dy) (p[SX] = scrollX), (p[SY] = scrollY), game.scroll?.(dx, dy);
+          ctl[CALM] = reduced() ? 1 : 0;
+          ctl[KX] = input.axis("left", "right", 0);
+          ctl[KY] = input.axis("up", "down", 1);
+          if (ctl[KX] || ctl[KY]) mode = 0;
+          ctl[MODE] = mode;
+          ctl[PX] = p[P_X]!;
+          ctl[PY] = p[P_Y]!;
+          ctl[PON] = p[P_ON]!;
+          ctl[FIRE] = def.fire && (input.down("fire") || p[P_DOWN] || auto) ? 1 : 0;
+        },
+        render(eng) {
+          const dt = eng.timing[0]!, r = reduced();
+          for (let i = 0; i < eng.events.size; i++) game.react?.(eng.events.at(i)!);
+          // The run ended (read from the game, never from a ring that may drop events when full).
+          const o = game.over();
+          if (o && !ending) (ending = 1), queueMicrotask(() => flow(o === 2 ? "won" : "lost"));
+          if (jump) (jump = 0), gate();
+          if (def.paint !== false) paint();
+          const d = view[DPR]!, W = ctl[VW]!, H = ctl[VH]!;
+          c2d.setTransform(d, 0, 0, d, 0, 0);
+          c2d.clearRect(0, 0, W, H);
+          // Target beacons: a ring that beats faster as the target weakens.
+          const max = ctl[TARGET_HP]! || 100;
+          c2d.lineWidth = 2;
+          for (const g of board.targets) {
+            if (!(g.w > 0 && g.hp > 0)) continue;
+            const fill = (g.hp / max) * 100;
+            c2d.globalAlpha = r ? 0.7 : 0.45 + 0.35 * Math.sin((eng.time * 6.2832) / (0.7 + 2.1 * (1 - fill / 100)));
+            c2d.strokeStyle = signal(fill);
+            c2d.strokeRect(g.x - 5, g.y - 5, g.w + 10, g.h + 10);
+          }
+          c2d.globalAlpha = 1;
+          game.draw(c2d, dt);
+          for (let i = 0; i < SN; i++) {
+            if (kl[i]! <= 0) continue;
+            kl[i]! -= dt;
+            kx[i]! += kvx[i]! * dt;
+            ky[i]! += kvy[i]! * dt;
+            c2d.globalAlpha = Math.min(1, Math.max(0, kl[i]! * 3));
+            c2d.fillStyle = def.colors[kc[i]!]!;
+            c2d.fillRect(kx[i]!, ky[i]!, 3, 3);
+          }
+          c2d.globalAlpha = 1;
+          c2d.font = "700 16px ui-monospace, monospace";
+          c2d.textAlign = "center";
+          c2d.lineJoin = "round";
+          for (let i = 0; i < PN; i++) {
+            if (pl[i]! <= 0) continue;
+            pl[i]! -= dt;
+            if (!r) py[i]! -= 18 * dt;
+            const text = pt[i] ?? label(pv[i]!);
+            c2d.globalAlpha = Math.min(1, Math.max(0, pl[i]! / 0.4));
+            c2d.strokeStyle = theme === "dark" ? "#101010" : "#ffffff";
+            c2d.lineWidth = 6;
+            c2d.strokeText(text, px[i]!, py[i]!);
+            c2d.strokeStyle = "#101010";
+            c2d.lineWidth = 3;
+            c2d.strokeText(text, px[i]!, py[i]!);
+            c2d.fillStyle = TONE[pc[i]!]!;
+            c2d.fillText(text, px[i]!, py[i]!);
+          }
+          c2d.globalAlpha = 1;
+          hud.write();
+          if ((view[NOTE]! += dt) >= 0.1) (view[NOTE] = 0), notify();
+        },
+      };
+      e.add(shell);
+      function stats(): Record<string, unknown> {
+        let visible = 0, spent = 0, sparks = 0;
+        const g = board.glyphs;
+        for (let i = 0; i < g.count; i++) (spent += g.spent[i]!), (visible += g.w[i]! > 0 ? 1 : 0);
+        for (let i = 0; i < SN; i++) if (kl[i]! > 0) sparks++;
+        return { ...game.stats(), board: { indexed: g.count, visible, spent, measurements: board.reads }, particles: sparks };
+      }
+      // First frame: measure, then a fresh run.
+      shell.read!(e);
+      p[SX] = scrollX;
+      p[SY] = scrollY;
+      p[P_X] = innerWidth / 2;
+      p[P_Y] = innerHeight * 0.65;
+      board.refresh();
+      game.reset();
+      return { engine: e as Engine, life, host, ui, view: hud, stats };
+    } catch (err) {
+      // A run that fails to start leaves nothing behind.
+      built?.destroy();
+      life.abort();
+      host.remove();
+      throw err;
+    }
+  }
+
+  // ---------- The controller ----------
+  function teardown() {
+    run?.life.abort();
+    run?.engine.destroy();
+    run?.host.remove();
+    run = null;
+  }
+  function start() {
+    if (destroyed) throw new Error("This game instance was destroyed. Create another instance.");
+    teardown();
+    notice = "";
+    try {
+      run = begin();
+      status = "running";
+      const go = () => status === "running" && run?.engine.start();
+      run.view.begin ? run.view.begin(go) : go();
+      run.view.sync();
+      run.view.write();
+      toast(run.view.msg, matchMedia("(pointer: coarse)").matches ? def.touchHint ?? def.hint : def.hint, 4200);
+      emit("start");
+    } catch (err) {
+      teardown();
+      status = "idle";
+      options.onError?.(err);
+      throw err;
+    }
+    notify();
+    return getSnapshot();
+  }
+  function pause() {
+    if (status === "running") flow("pause");
+  }
+  function resume() {
+    if (status === "paused" && !document.hidden) flow("resume");
+  }
+  // A HUD with its own flow (skirmish on @fzlt/core/match) owns the phase: it is asked, and answers with go().
+  const flow = (to: ArcadeFlow) => run && (run.view.ask ? run.view.ask(to) : go(to));
+  function go(to: ArcadeFlow | "restart" | "exit") {
+    if (to === "restart") return void start();
+    if (to === "exit") return stop();
+    if (!run || (status !== "running" && status !== "paused")) return;
+    const p = to === "pause";
+    if (p || to === "resume") {
+      status = p ? "paused" : "running";
+      run.engine[p ? "stop" : "start"]();
+      run.view.sync();
+      notify();
+      return emit(to);
+    }
+    // A run ends: the page comes back at once (the engine's ledger), the scoreboard stays with the
+    // result and a Restart key.
+    const won = to === "won";
+    last = run.stats();
+    status = won ? "won" : "gameover";
+    notice = won ? "Page cleared and restored. Restart for another run." : "Run ended. Page restored. Restart for another run.";
+    const { host, ui, view } = run;
+    view.hold?.();
+    run.engine.destroy();
+    const ended = last;
+    run = { ...run, stats: () => ended };
+    ui.querySelector("canvas")?.remove();
+    view.end(won, notice, ended);
+    emit(status, { score: last.score });
+    notify();
+    host.dataset.over = status;
+  }
+  function stop() {
+    if (destroyed) return;
+    if (run && (status === "running" || status === "paused")) last = run.stats();
+    teardown();
+    status = "idle";
+    notice = "";
+    notify();
+    emit("recall");
+  }
+  function destroy() {
+    if (destroyed) return;
+    stop();
+    destroyed = true;
+    status = "destroyed";
+    notify();
+  }
+  return { start, pause, resume, stop, destroy, getSnapshot };
+}

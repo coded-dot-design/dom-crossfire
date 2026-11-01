@@ -1,0 +1,25 @@
+{
+  "name": "@coded-design/dom-crossfire",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "DOM Crossfire: the virus scrambled the cartridges. Five DOM VIRUS games channel-surf on one board. Built on Fizlet, by Chris Cooley.",
+  "license": "MIT",
+  "author": "Chris Cooley (https://coded.design/)",
+  "scripts": {
+    "sync": "node scripts/sync.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "npm run typecheck && node scripts/build.mjs",
+    "size": "node scripts/size.mjs",
+    "check": "npm run build && npm run size",
+    "test": "node --expose-gc tests/alloc.mjs",
+    "test:settle": "node tests/settle.mjs",
+    "test:browser": "node tests/browser.mjs",
+    "play": "node scripts/play.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "playwright": "1.58.2",
+    "typescript": "7.0.2"
+  }
+}

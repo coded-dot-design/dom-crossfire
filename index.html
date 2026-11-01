@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- DOM Crossfire's board page: an ordinary page (its copy is terrain, its buttons are targets) with a
+     PLAY key that loads dist/dom-crossfire.mjs. Build first (npm run check), then npm run play.
+     Escape gives the page back exactly. By Chris Cooley, built on Fizlet. -->
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DOM Crossfire</title>
+<meta name="description" content="DOM Crossfire: the virus scrambled the cartridges. One arena, one score; every 30 seconds the rules change channel between five DOM VIRUS games.">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; font: 17px/1.6 system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 96px; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; margin: 20px 0; }
+  .row button { font: inherit; padding: 8px 16px; border-radius: 8px; border: 1px solid currentColor; background: none; color: inherit; cursor: pointer; }
+  #play { font-weight: 700; }
+  footer { margin-top: 48px; font-size: 14px; opacity: 0.75; }
+</style>
+<main>
+  <h1>DOM Crossfire</h1>
+  <p><strong>The virus scrambled the cartridges.</strong> One arena, one score. Every 30 seconds the console glitches and the rules change channel: same stick, new game. Survive all five.</p>
+  <ol>
+    <li>CH 1 Null Invaders: the fleet descends.</li>
+    <li>CH 2 Byte Runner: no gun. Eat the bytes, dodge the flies.</li>
+    <li>CH 3 Sherman Bytes: the turret aims itself.</li>
+    <li>CH 4 Swarm Protocol: the swarm floods in.</li>
+    <li>CH 5 DOM Battlefield: the grid locks your moves.</li>
+  </ol>
+  <div class="row"><button id="play" type="button" data-fizlet-ignore>PLAY</button></div>
+  <h2>The page is the board</h2>
+  <p>This is an ordinary page. Its words, headings and buttons are what the game plays on; when the
+    round ends, or you press Escape, every letter goes back where it was.</p>
+  <div class="row">
+    <button type="button">Sign up</button>
+    <button type="button">Learn more</button>
+    <button type="button">Contact</button>
+  </div>
+  <h2>Controls</h2>
+  <ul>
+    <li>Arrows / WASD / touch stick — move</li>
+    <li>Space / hold the pointer — fire</li>
+    <li>P — pause · Esc — give the page back</li>
+  </ul>
+  <p>Read <a href="https://github.com/coded-dot-design/fizlet">how Fizlet works</a>, or press PLAY.</p>
+  <footer>DOM Crossfire by Chris Cooley · built on Fizlet · MIT</footer>
+</main>
+<script type="module">
+  import { createDomCrossfire } from "./dist/dom-crossfire.mjs";
+  let game = null;
+  document.getElementById("play").addEventListener("click", () => {
+    game?.destroy();
+    (window.game = game = createDomCrossfire()).start();
+  });
+</script>
+</html>

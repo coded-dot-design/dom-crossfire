@@ -1,0 +1,164 @@
+{
+  "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
+  "repository": "https://github.com/coded-dot-design/fizlet",
+  "version": "0.21.2",
+  "commit": "2922cbd9856c0584aa2e1925e8cf1999838e09e6",
+  "files": [
+    {
+      "path": "arcade-parts.ts",
+      "sha256": "a13122dbe27d03d96698fdb089b48a85e54e5db5c168732bdf3c913bc3e817d2"
+    },
+    {
+      "path": "arcade-skirmish.ts",
+      "sha256": "7ee0a147d13db54d8ffac867ae95384e452addc786b54084f996eac4cf6c86a3"
+    },
+    {
+      "path": "arcade.ts",
+      "sha256": "0f3154de8a31c376c56d9c07930a41920ad86fc81b7755dac60e28ec3e1b4a34"
+    },
+    {
+      "path": "board-page.ts",
+      "sha256": "bc0a451d1185417318aed80b8c23bca930d6700d9f8fb905966fa1ae859f7c99"
+    },
+    {
+      "path": "camera.ts",
+      "sha256": "8a9b82d86ed084d93aababb51f4529f8165168ae1e3d60760c7b6ab2867f0c5d"
+    },
+    {
+      "path": "coach.ts",
+      "sha256": "3b46563e7371df815fed55a21c3881d8e036a4662d414b25cddf7b8e10c0e2ee"
+    },
+    {
+      "path": "collide.ts",
+      "sha256": "a71500e4cdb963db2e8684bf8e1780871380a53611bd03f8298de1a2ea7c54a1"
+    },
+    {
+      "path": "css-clock.ts",
+      "sha256": "c88eb1527276b4b475dbd2d976d7b2108a85c4af45bd63cdd3957b01b73b94e9"
+    },
+    {
+      "path": "debug.ts",
+      "sha256": "d968d408653ffe3cd629b10083d79e2d8aff1abe7e88eb0bcbae07f419352015"
+    },
+    {
+      "path": "embed.ts",
+      "sha256": "2a270582f980d4d4dc92d27249556c2b6ac8ab97fa8c80409446f40bfa743ac5"
+    },
+    {
+      "path": "fx.ts",
+      "sha256": "83535c609d6322aeba6d203808c4f1628b9390e49e681141ba85f29404b08815"
+    },
+    {
+      "path": "grid.ts",
+      "sha256": "cfeb511cb2c507b36d4bf0309d8f34c5e9cf02bdba45425cab6a1220c6dbbfda"
+    },
+    {
+      "path": "hud.ts",
+      "sha256": "be813ce715d3fbad8fcdf6b558274cd28adf427d45c7fa7f8ef96fe02da0c2f3"
+    },
+    {
+      "path": "index.ts",
+      "sha256": "ce583813a38ce1f1dd787fba1dd4077734b1e932789ed4ba2b4c3d736230899c"
+    },
+    {
+      "path": "input.ts",
+      "sha256": "0a638ab936d1697694fc3fc6970ed23d0bbe9f26b6ef71180937d4f8446473c2"
+    },
+    {
+      "path": "kernel/engine.ts",
+      "sha256": "08009b9722c36858f33ebab00d7ffbcdd27d33abf8a11af523e4c832f2ef856b"
+    },
+    {
+      "path": "kernel/index.ts",
+      "sha256": "35bd584659e5b83e9e68cc6615c25c20090f237f6b06c96d8d3c6f95e6e251e3"
+    },
+    {
+      "path": "kernel/ledger.ts",
+      "sha256": "10677319dde10d3dee138235e800a135fd433a6967de89b5430d567fc9de3f03"
+    },
+    {
+      "path": "kernel/need.ts",
+      "sha256": "dd7626c7bba10daf4ae0a0aecbd929d1ff9903e6f5be0c3470e51595bb7ee740"
+    },
+    {
+      "path": "kernel/pool.ts",
+      "sha256": "d5201f9d7db9362717614a8cfb1bc519dabecbe981a0cac94740d98cf0998627"
+    },
+    {
+      "path": "kernel/random.ts",
+      "sha256": "9f57fdfa7ca9eaa5cc8b52bfb60c37e0e617b87195e733f8ec3f332c09824750"
+    },
+    {
+      "path": "kernel/ring.ts",
+      "sha256": "c2a2c57bf69651ab703ca88c4d2dc65f92a1f7f126caad17f2d7d43211b02449"
+    },
+    {
+      "path": "layout.ts",
+      "sha256": "958b0990b42a546a2691a687a0ea94973a8a2113411b505d14f196adc343f69a"
+    },
+    {
+      "path": "match.ts",
+      "sha256": "d3702b9029a2482c12ada12ca631db432826da807df3a7447fda3a648d391288"
+    },
+    {
+      "path": "pad.ts",
+      "sha256": "f9ed7df5b38143bc3e1c5f1c056ba668f7de4aa377fc353a40d6be2ba81f3cf3"
+    },
+    {
+      "path": "perf.ts",
+      "sha256": "a2c4d169ff5aa535a6a6aea9cd1166582c4486eca3814c2dbaeceaa86cd8982a"
+    },
+    {
+      "path": "presence-check.ts",
+      "sha256": "e0af97cf6ebf1f0102d4e4045b5c928aed02047f54c1155c49ec113a6f3e2c21"
+    },
+    {
+      "path": "presence.ts",
+      "sha256": "f178459faf643a771acff2bc05aaa003812bc9c1d4d5512faa95fb5b0aa1fe8f"
+    },
+    {
+      "path": "rules.ts",
+      "sha256": "5b7ec826a1f8fcb95abd6e53d41859e1cc15635beacca1efb693aeef34165f9a"
+    },
+    {
+      "path": "slot.ts",
+      "sha256": "6592cd1d4d368581b2c128ac5e263ec02682f6ba67167da73d1c642e96b5b203"
+    },
+    {
+      "path": "sound.ts",
+      "sha256": "7d6ac6cb4cfed2e0154bb74736392a6f8820ab3a32ba60f6e1e972001e3b0161"
+    },
+    {
+      "path": "sprite.ts",
+      "sha256": "dd613ebc657c0cf12d104e1ae7c345e016bb880162afee6fcdcb8aced46c3466"
+    },
+    {
+      "path": "steer.ts",
+      "sha256": "9fb2de50ef5af7be4de461da8c37ec884c95bf18b5f1a21e1af9af60839c7549"
+    },
+    {
+      "path": "timeline.ts",
+      "sha256": "dd796399c28f090ea987e212ca20f581a9f52cf16d0cb6d625d1ddeeb0a0c89e"
+    },
+    {
+      "path": "touch.ts",
+      "sha256": "bf13132a2db706f0eb1eb5dd482ccdf2e639c58ab5516c8d74331294161fe594"
+    },
+    {
+      "path": "ui/board-ui.css",
+      "sha256": "87a5297611cef45e68f38b4555386e29fa9a4506b63b921e5f7533838cc19728"
+    },
+    {
+      "path": "ui/board-ui.ts",
+      "sha256": "4174d7ed6ad6a2bff7c2eda1586b6e1b5e26ff631101e1e9a95ed333d676ee6f"
+    },
+    {
+      "path": "ui/tokens.json",
+      "sha256": "3f334889bad4bc717499ac2c63e2c23fe6663b0794cf4bfdf85672bf74e40317"
+    },
+    {
+      "path": "view-canvas.ts",
+      "sha256": "62fa4240f5d23d51a6a04e3be75d94b29262e5f278f254393e8530bc6c6d2575"
+    }
+  ]
+}
