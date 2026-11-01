@@ -2198,7 +2198,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     $<HTMLElement>("[data-ll]").textContent = plane ? "SALVO" : "LONG";
     keys.long.setAttribute("aria-label", plane ? "Salvo: four homing rockets (E)" : "Long shot: locks on and hits from across the field (E)");
     keys.long.title = plane ? "E · Salvo" : "E · Long shot";
-    $<HTMLElement>("[data-help]").textContent = `WASD ${plane ? "FLY" : "DRIVE"} · MOUSE AIM · CLICK FIRE · E ${plane ? "SALVO" : "LONG SHOT"} · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC/P PAUSE"}`;
+    $<HTMLElement>("[data-help]").textContent = `WASD ${plane ? "FLY" : "DRIVE"} · MOUSE AIM · CLICK FIRE · E ${plane ? "SALVO" : "LONG SHOT"} · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC/P PAUSE"}`;
     wrap.style.setProperty("--team", you.color);
     wrap.style.setProperty("--pc", mate.color);
     hud.pn.textContent = mate.name;
