@@ -175,7 +175,7 @@ const CSS = `:host{all:initial;display:block}*{box-sizing:border-box}
 .bz.embed{position:fixed;z-index:2147483000}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:crosshair}
 .aiming canvas{cursor:none}
-.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:auto;cursor:grab;touch-action:none;white-space:nowrap}.hud.on{cursor:grabbing}
+.hud{position:absolute;left:50%;top:max(10px,env(safe-area-inset-top));translate:-50% 0;display:flex;gap:14px;align-items:center;padding:8px 14px;background:color-mix(in srgb,var(--surface) 93%,transparent);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim);pointer-events:none;white-space:nowrap}
 .hud b{font-size:17px;font-weight:900}.hud small{display:block;font-size:8px;letter-spacing:.16em;color:var(--muted)}
 .hud .sc b{color:var(--team)}.hud .wv b{color:var(--wc,var(--k-sys-ink))}.hud .dr b{color:var(--k-fire-ink)}
 .bui[data-theme=light] .hud .sc b{color:#0a8a55}
@@ -259,7 +259,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 @media ${PHONE}{.stk{position:absolute;left:max(16px,env(safe-area-inset-left));bottom:max(16px,env(safe-area-inset-bottom));display:block;width:116px;height:116px;border:2.5px solid var(--line);border-radius:50%;background:color-mix(in srgb,var(--surface) 55%,transparent);touch-action:none}
 .stk::before{content:"";position:absolute;inset:-28px;border-radius:50%}
 .stk i{position:absolute;left:31px;top:31px;width:50px;height:50px;background:var(--team);border:2.5px solid var(--rim);border-radius:50%;box-shadow:0 4px 0 var(--rim)}
-.pre .stk,.demo .stk,.bui .pad .grab{display:none}.bui :is(.auto,.lock){bottom:106px;width:56px;height:56px}.bui :is(.long,.strike){bottom:166px}.hud{translate:-50% 0!important;cursor:default;background:color-mix(in srgb,var(--surface) 80%,transparent)}.pad{translate:none!important}
+.pre .stk,.demo .stk,.bui .pad .grab{display:none}.bui :is(.auto,.lock){bottom:106px;width:56px;height:56px}.bui :is(.long,.strike){bottom:166px}.hud{translate:-50% 0!important;background:color-mix(in srgb,var(--surface) 80%,transparent)}.pad{translate:none!important}
 .feed{left:50%;right:auto;translate:-50% 0;justify-items:center}.feed li:nth-child(n+3){display:none}}`;
 
 export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
@@ -1727,6 +1727,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       }
       if (u.drop < 1) {
         u.drop = Math.min(1, u.drop + dt / (u.kind === PLANE ? 1 : 1.5));
+        u.cool = Math.max(0, u.cool - dt); // the guns are ready by the time you land: a held click fires at once
         if (u.drop >= 1) {
           u.shield = Math.max(u.shield, 1.2);
           puff(2, u.x, u.y, 22, 0.45, 7);
@@ -2895,17 +2896,12 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     for (const t of ["pointerup", "pointercancel"]) handle.addEventListener(t, () => handle.classList.contains("on") && (handle.classList.remove("on"), save()), { signal: e.signal });
     handle.addEventListener("dblclick", () => ((at[0] = at[1] = 0), place(), save()), { signal: e.signal });
   };
-  const pad = $<HTMLElement>("[data-pad]"), hudBar = $<HTMLElement>(".hud");
+  const pad = $<HTMLElement>("[data-pad]");
   movable(pad, $<HTMLButtonElement>("[data-grab]"), "crossfire:pad", (at, r) => {
     const pw = pad.offsetWidth * 0.9, ph = pad.offsetHeight * 0.9;
     at[0] = Math.max(-(r.width - pw - 8), Math.min(8, at[0]!));
     at[1] = Math.max(-(r.height - ph - 8), Math.min(8, at[1]!));
   }, (x, y) => `${x}px ${y}px`);
-  movable(hudBar, hudBar, "crossfire:hud", (at, r) => {
-    const sx = Math.max(0, (r.width - hudBar.offsetWidth) / 2 - 8);
-    at[0] = Math.max(-sx, Math.min(sx, at[0]!));
-    at[1] = Math.max(-hudBar.offsetTop + 4, Math.min(r.height - hudBar.offsetTop - hudBar.offsetHeight - 8, at[1]!));
-  }, (x, y) => `calc(-50% + ${x}px) ${y}px`);
   $<HTMLButtonElement>("[data-pause]").addEventListener("click", () => state === "play" && togglePause(), { signal: e.signal });
   const fsKey = $<HTMLButtonElement>("[data-fs]");
   const fsOn = () => document.fullscreenElement === host || wrap.classList.contains("full");
