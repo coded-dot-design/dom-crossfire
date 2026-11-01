@@ -445,8 +445,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     coverN = blocks.length;
     for (let k = 0; k < 8; k++) blocks.push(dbl({ x: 0, y: 0, w: 0, h: 0, hp: 0, back: 0, site: -2 }, "x y w h hp back"));
-    // The copy: lines of the four games' taglines, set like a page in the open rows.
+    // The copy: lines of the four games' taglines, set like a page in the open rows. Not in the
+    // attract match: behind a landing's headline it would only be clutter.
     glyphs = 0;
+    if (demo) return;
     const cw = Math.round(T * 0.27), lines = Math.max(3, Math.min(7, Math.floor(rows / 2.2)));
     for (let l = 0; l < lines && glyphs < GCAP; l++) {
       const text = COPY[(l + Math.floor(R() * COPY.length)) % COPY.length]!, len = text.length * cw;
