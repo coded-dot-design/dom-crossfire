@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.1
+
+- Click to fire on desktop: a held mouse button on the field fires from the moment you land, with
+  either ride. The 0.6 s gun cooldown a ride used to land with is gone, so it no longer swallows a
+  held click (Space already worked once it ran out); the landing shield still covers you.
+- The scoreboard no longer takes the pointer (`pointer-events: none`; it has no keys of its own), so
+  a click under it, mid-field, reaches the game. It no longer drags, either.
+- Browser test: a held click on the field fires, and a click under the scoreboard reaches the
+  field, for both rides.
+- The step's effects (blasts, words, puffs) and damage now go through the step's registers, and the
+  rides' part of the step is split into small functions, so it stays at 0 minor GCs in 20,000 steps
+  as the match changes (CI's Chrome 145 had counted 3 with the first version of this fix).
+- Size: 50,748 B gzip (drop-in), 50,794 B (module).
+
 ## 0.2.0
 
 v2: started over on Battlefield Blitz (pending owner review).

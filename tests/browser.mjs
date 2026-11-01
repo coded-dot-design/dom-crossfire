@@ -125,6 +125,38 @@ try {
     assert.deepEqual(errors, []);
     await close();
   }
+  // Click to fire (desktop): a held mouse button on the field fires, for both rides, from the moment
+  // you land; a press on the scoreboard (mid-field, top) reaches the field too.
+  where = "click to fire";
+  for (const ride of ["tank", "plane"]) {
+    const { page, errors, close } = await open(browser, { url: "/play/", width: 1440, height: 900 });
+    await page.evaluate((ride) => (window.crossfire.ride = ride), ride);
+    await page.evaluate(() => window.crossfire.start());
+    await page.waitForFunction(() => window.crossfire.state === "play" && window.crossfire.world.crew[0].alive && window.crossfire.world.crew[0].drop >= 1, null, { timeout: 8000 });
+    // Trigger pulls, not shells in the air: a shell fired into cover stops the frame it's fired.
+    const shots = () => page.evaluate(() => window.crossfire.world.crew[0].shots);
+    const box = await page.locator("#cf").boundingBox();
+    await page.mouse.move(box.x + box.width * 0.5, box.y + box.height * 0.45);
+    const s0 = await shots();
+    await page.mouse.down();
+    await page.waitForTimeout(400);
+    const held = (await shots()) - s0;
+    await page.mouse.up();
+    assert.ok(held > 0, `${ride}: a held click on the field fires right after landing (${held} shots)`);
+    const hud = await page.evaluate(() => { const sr = document.querySelector("#cf").shadowRoot, r = sr.querySelector(".hud").getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, pe: getComputedStyle(sr.querySelector(".hud")).pointerEvents, top: sr.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)?.tagName }; });
+    assert.equal(hud.pe, "none", "the scoreboard never takes the pointer");
+    assert.equal(hud.top, "CANVAS", "a press on the scoreboard lands on the field");
+    await page.waitForTimeout(500);
+    await page.mouse.move(hud.x, hud.y);
+    const s1 = await shots();
+    await page.mouse.down();
+    await page.waitForTimeout(300);
+    const under = (await shots()) - s1;
+    await page.mouse.up();
+    assert.ok(under > 0, `${ride}: a held click under the scoreboard fires (${under} shots)`);
+    assert.deepEqual(errors, []);
+    await close();
+  }
   // The drop-in on a plain page: the toggle, the page is the arena, Escape gives it back.
   where = "drop-in";
   {
@@ -146,7 +178,7 @@ try {
     assert.deepEqual(errors, []);
     await close();
   }
-  console.log("DOM Crossfire browser test green: landing, start screen and ride pick, countdown, wave card, keys, partner, pause, surrender, a won match, the drop-in.");
+  console.log("DOM Crossfire browser test green: landing, start screen and ride pick, countdown, wave card, keys, partner, pause, surrender, a won match, click to fire (both rides), the drop-in.");
 } catch (err) {
   console.error(`browser test failed at: ${where}`);
   throw err;
