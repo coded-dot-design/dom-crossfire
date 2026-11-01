@@ -1,6 +1,6 @@
 {
   "name": "@coded-design/dom-crossfire",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "DOM Crossfire: pick the plane or the tank, your AI partner takes the other, and the bad guys of four DOM VIRUS games come at you in waves. Built on Battlefield Blitz and Fizlet, by Chris Cooley.",
@@ -15,7 +15,9 @@
     "test": "node --expose-gc --test --test-concurrency=1 tests/*.test.mjs",
     "test:settle": "node tests/settle.mjs",
     "test:browser": "node tests/browser.mjs && node tests/phone.mjs",
-    "play": "node scripts/play.mjs"
+    "play": "node scripts/play.mjs",
+    "test:lockstep": "node tests/lockstep.mjs",
+    "test:squad": "node tests/lockstep.mjs && node tests/squad.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

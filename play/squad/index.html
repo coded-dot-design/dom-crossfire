@@ -1,0 +1,90 @@
+<!doctype html>
+<!-- DOM Crossfire, squad play: 2 to 4 people in one co-op match over a fizlet-rooms room server
+     (Battlefield Blitz's room card). The game is dist/dom-crossfire-net.mjs, loaded by dist/squad.js.
+     By Chris Cooley, built on Fizlet. -->
+<html lang="en" class="bui" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<title>DOM Crossfire · squad</title>
+<meta name="description" content="DOM Crossfire for 2 to 4 people: a co-op squad, each in the plane or the tank, against four DOM VIRUS armies. Enter an invite code and pick a room.">
+<meta name="referrer" content="no-referrer">
+<script>(function(){var u=new URL(location.href),p=u.searchParams,c=p.get("code");if(!p.has("code"))return;p.delete("code");history.replaceState(history.state,"",u.pathname+u.search+u.hash);if(c)window.__cfInvite=c})();</script>
+<link rel="canonical" href="https://crossfire.domvirus.com/play/squad/">
+<meta name="theme-color" content="#07060f">
+<link rel="icon" href="../../dist/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../dist/site.css">
+<script>try{var t=localStorage.getItem("dom-virus:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
+</head>
+<body data-page="squad" data-app>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-head">
+  <div class="wrap">
+    <a class="brand" href="../../" aria-label="DOM Crossfire home">
+      <span class="brand-mark"><img src="../../dist/icon.svg" width="40" height="40" alt=""></span>
+      <span class="brand-text"><small>DOM<i>VIRUS · CO-OP</i></small><b>CROSSFIRE</b></span>
+    </a>
+    <nav class="site-nav" aria-label="Site">
+      <a href="../../#armies">The four armies</a>
+      <a href="../../#drop">Put it on your site</a>
+      <a href="https://domvirus.com/">DOM VIRUS ↗</a>
+    </nav>
+    <div class="head-keys">
+      <a class="bui-key bui-icon-key gh" href="https://github.com/coded-dot-design/dom-crossfire" aria-label="Source on GitHub"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 17c-4 1.2-4-2-5.5-2.5m11 4.5v-3a2.6 2.6 0 0 0-.7-2c2.4-.3 4.9-1.2 4.9-5.3a4.1 4.1 0 0 0-1.1-2.8 3.8 3.8 0 0 0-.1-2.8s-.9-.3-2.9 1.1a10 10 0 0 0-5.2 0C5.9 2.8 5 3.1 5 3.1a3.8 3.8 0 0 0-.1 2.8 4.1 4.1 0 0 0-1.1 2.8c0 4.1 2.5 5 4.9 5.3a2.6 2.6 0 0 0-.7 2v3"/></svg></a>
+      <button class="bui-key bui-icon-key" type="button" data-theme-toggle aria-label="Switch light or dark"><span class="theme-dark"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8Z"/></svg></span><span class="theme-light"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4"/></svg></span></button>
+      <a class="bui-key bui-arcade bui-go play-key" href="../"><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 4 10 6-10 6Z"/></svg>Play</a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="cf-stage squad" aria-labelledby="cf-squad-title" data-rooms="wss://fizlet-rooms.fizlet.workers.dev">
+    <h1 id="cf-squad-title" class="cf-title">DOM Crossfire · squad</h1>
+    <div id="cf" class="cf-host"></div>
+    <aside class="room bui-card" data-step="join" data-conn="off" aria-labelledby="room-title">
+      <header class="head"><i class="dot" aria-hidden="true"></i><b id="room-title" data-title>SQUAD</b><small data-sub role="status">NOT CONNECTED</small></header>
+      <div class="body" data-scroll>
+        <form class="step" data-for="join" id="gate" novalidate>
+          <label>INVITE CODE <input name="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required minlength="6" maxlength="64" placeholder="CROSSFIRE-XXXX"></label>
+          <div class="pick" role="group" aria-labelledby="ride-label"><span id="ride-label">YOUR RIDE</span>
+            <div class="bui-seg rides"><button class="bui-key" type="button" data-ride="tank" aria-pressed="false"><img src="../../dist/art/tank.svg" alt="" width="26" height="26">TANK</button><button class="bui-key" type="button" data-ride="plane" aria-pressed="true"><img src="../../dist/art/plane.svg" alt="" width="28" height="26">PLANE</button></div>
+          </div>
+          <div class="pick" role="group" aria-label="Room"><span>ROOM</span>
+            <div class="rooms"><button class="bui-key" type="button" data-room="-1" aria-label="Previous room">−</button><output name="roomShow" aria-live="polite">1</output><button class="bui-key" type="button" data-room="1" aria-label="Next room">+</button></div>
+          </div>
+          <button class="bui-key bui-sticker-key go" type="submit" data-join><svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 4 10 6-10 6Z"/></svg><b>JOIN</b></button>
+          <p class="say" role="alert" data-say></p>
+          <p class="fine">Co-op, 2 to 4 people: the same code, the same room. Each picks the plane or the tank. The match starts when four are in, or when P1 starts it. A squad of two keeps the AI partner.</p>
+        </form>
+        <div class="step" data-for="wait">
+          <ol class="seats" data-wait-seats aria-label="Seats"></ol>
+          <p class="big" data-wait-say>Waiting for your squad.</p>
+          <button class="bui-key bui-sticker-key" type="button" data-start hidden><svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 4 10 6-10 6Z"/></svg><b data-start-say>START NOW</b></button>
+          <div class="keys"><button class="bui-key bui-sticker-key" type="button" data-share><b data-share-say>COPY LINK</b></button><button class="bui-key bui-sticker-key bui-second" type="button" data-cancel><b>CANCEL</b></button></div>
+        </div>
+        <div class="step" data-for="play">
+          <table class="score" aria-label="The squad"><thead><tr><th scope="col">WHO</th><th scope="col">RIDE</th><th scope="col">K</th></tr></thead><tbody data-rows></tbody></table>
+          <p class="fine">Same match on every screen: only moves travel.</p>
+          <button class="bui-key bui-sticker-key bui-second" type="button" data-leave><b>LEAVE</b></button>
+        </div>
+        <div class="step" data-for="gone">
+          <p class="word" data-gone-word>PLAYER LEFT</p>
+          <p class="big" data-gone-say>Someone in the squad left.</p>
+          <div class="keys"><button class="bui-key bui-sticker-key" type="button" data-again><svg viewBox="0 0 20 20" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 4 10 6-10 6Z"/></svg><b>REJOIN</b></button><button class="bui-key bui-sticker-key bui-second" type="button" data-new><b>NEW ROOM</b></button></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+  <div class="wrap cf-bar">
+    <p><b>CROSSFIRE · SQUAD</b> · same code, same room · <kbd>WASD</kbd> drive or fly · <kbd>mouse</kbd> aim · <kbd>click</kbd> fire · <kbd>E</kbd> special · <kbd>F</kbd> airstrike</p>
+    <p><a href="../">Play solo</a> · <a href="../../">About Crossfire</a></p>
+  </div>
+</main>
+<a class="bui-key bui-icon-key game-exit" href="../../" aria-label="Exit to the Crossfire home" title="Crossfire home"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M2.5 10 10 3l7.5 7M5 8v9h10V8"/></svg></a>
+<footer class="site-foot">
+  <div class="foot-base">
+    <div class="wrap"><span>© 2026 coded.design · MIT</span><span class="foot-legal"><a href="https://domvirus.com/legal/privacy/">Privacy</a></span><span>Created by Chris Cooley · built on Fizlet</span></div>
+  </div>
+</footer>
+<script type="module" src="../../dist/squad.js"></script>
+</body>
+</html>

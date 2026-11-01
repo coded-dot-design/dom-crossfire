@@ -6,10 +6,13 @@
 // 50,748 / 50,794 B, page.js 2,761 B.
 // 0.3.0 (four waves a section, mini-bosses, Byte Runner flipped: the frog, pellets on blocks): measured
 // 52,035 / 52,071 B (+1,287 / +1,277); budgets 51,200 → 52,480.
+// 0.4.0 (squad play): the solo builds carry the squad seats, the input word and the match hash (as
+// Blitz's do): 53,575 / 53,638 B (+1,540 / +1,567), budgets 53,760. dom-crossfire-net.mjs (the module
+// plus @fzlt/core/presence and the room join) 55,191 B, budget 55,424. squad.js (the room card) 3,255 B.
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 let failed = false;
-for (const [file, budget] of [["dist/dom-crossfire.js", 52480], ["dist/dom-crossfire.mjs", 52480], ["dist/page.js", 3072]]) {
+for (const [file, budget] of [["dist/dom-crossfire.js", 53760], ["dist/dom-crossfire.mjs", 53760], ["dist/dom-crossfire-net.mjs", 55424], ["dist/page.js", 3072], ["dist/squad.js", 3584]]) {
   const gz = gzipSync(readFileSync(file)).length, ok = gz <= budget;
   failed ||= !ok;
   console.log(`${ok ? "ok  " : "OVER"} ${file.padEnd(24)} ${gz} / ${budget} bytes gzip`);

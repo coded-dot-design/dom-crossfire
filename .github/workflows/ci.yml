@@ -24,3 +24,5 @@ jobs:
       - run: npm run test:settle
       # The landing, the start screen, a match, pause, a win, the drop-in; then phones (game mode).
       - run: npm run test:browser
+      # Squad play: 2-4 people in lockstep (in memory, then through the squad page on a stand-in room server).
+      - run: npm run test:squad

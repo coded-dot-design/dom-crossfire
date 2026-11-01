@@ -22,6 +22,14 @@
  * step allocates nothing (typed registers, pools, no closures or strings in the step: Blitz's K4).
  */
 import { createEngine } from "../vendor/fizlet/index";
+import type { presence as Presence, Transport } from "../vendor/fizlet/presence";
+
+// Squad play's lockstep (@fzlt/core/presence) is registered by the net build (src/net.ts →
+// dist/dom-crossfire-net.mjs), so the drop-in and the solo module don't carry it (Blitz's split).
+let lockstep: typeof Presence | null = null;
+export function useLockstep(p: typeof Presence) {
+  lockstep = p;
+}
 import { controls } from "../vendor/fizlet/input";
 import { effects } from "../vendor/fizlet/fx";
 import { sound } from "../vendor/fizlet/sound";
@@ -47,6 +55,11 @@ export interface CrossfireOptions {
   waves?: number;
   /** Called when a board match ends. */
   onEnd?: (r: CrossfireResult) => void;
+  /** Squad play (co-op, 2 to 4 people) in lockstep over @fzlt/core/presence: every peer runs the same
+   *  match from the room's seed and only inputs cross the wire. Each person picks the plane or the tank
+   *  (`ride`, agreed in the countdown); a squad of two keeps the AI partner, three or four don't. A
+   *  fixed 1100 × 640 arena, scaled to fit. `input` replaces this peer's controls (tests). */
+  net?: { transport: Transport; slot: number; players: number; delay?: number; input?: () => number; leave?: () => void };
 }
 
 const TAU = Math.PI * 2;
@@ -116,7 +129,11 @@ const PER = 4, FINALE = 17;
 const COPY = ["PROTECT EVERY LAST BYTE", "DELETE THE INVASION", "EVERY PAGE IS A BATTLEFIELD", "FOLLOW THE BITES", "EAT THE PAGE", "THE VIRUS SCRAMBLED THE CARTRIDGES"];
 
 interface Unit {
-  i: number; kind: number; name: string; color: string; you: boolean;
+  i: number; kind: number; name: string; color: string;
+  /** Drawn as yours (this screen). */
+  you: boolean;
+  /** Driven by a person (this screen's, or a squad mate's over the network); else the AI. */
+  human: boolean;
   x: number; y: number; a: number; ta: number; vx: number; vy: number;
   hp: number; alive: boolean; dead: number; drop: number; shield: number; rapid: number; triple: number;
   strikes: number; carpet: number; rail: number; charge: number; chargeT: number; heat: number; hot: number;
@@ -233,7 +250,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .ov .table{position:absolute;left:50%;top:56%;translate:-50% -50%}.ov.result .bui-sticker{top:24%}
 .bui :is(.fs,.dk){position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px));top:max(10px,env(safe-area-inset-top));width:40px;height:40px;min-height:0}.embed .fs,.demo .fs{display:none}
 .bz.full{position:fixed;z-index:2147483000}
-.bui .pz{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 48px);top:max(10px,env(safe-area-inset-top));display:inline-flex;align-items:center;gap:6px;height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz{display:none}
+.bui .pz{position:absolute;z-index:3;left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 48px);top:max(10px,env(safe-area-inset-top));display:inline-flex;align-items:center;gap:6px;height:40px;min-height:0;padding:0 12px}.demo .pz,.pre .pz,.net .pz{display:none}
 .pz svg{width:18px;height:18px;stroke:currentColor;stroke-width:3.2;fill:none}
 @media (pointer:coarse){.pz span{display:none}.bui :is(.fs,.pz,.dk){width:44px;height:44px;padding:0;justify-content:center}.bui .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 52px)}.pz svg{width:22px;height:22px}}
 @media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov.result .bui-sticker{top:20%}}
@@ -261,12 +278,15 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .feed{left:50%;right:auto;translate:-50% 0;justify-items:center}.feed li:nth-child(n+3){display:none}}`;
 
 export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
-  const mode = o.mode ?? "board", embed = mode === "embed", demo = !!o.demo;
+  const net = o.net ?? null, P = net ? net.players : 0;
+  const mode = net ? "board" : o.mode ?? "board", embed = mode === "embed", demo = !net && !!o.demo;
+  if (net && o.seed === undefined) throw new Error("Crossfire squad play needs the room's seed");
+  if (net && !lockstep) throw new Error("Crossfire squad play: import createCrossfire from dom-crossfire-net.mjs");
   const root = host.shadowRoot ?? host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
   style.textContent = __KIT_CSS__ + CSS;
   const wrap = document.createElement("div");
-  wrap.className = `bui bz ${mode}${demo ? " demo" : ""}`;
+  wrap.className = `bui bz ${mode}${demo ? " demo" : ""}${net ? " net" : ""}`;
   wrap.dataset.theme = "dark";
   wrap.innerHTML = `<canvas></canvas>
 <div class="hud"><div class="sc"><small>SCORE</small><b data-sc>0</b></div><div class="wv"><small data-wl>WAVE</small><b data-wv>1/5</b></div><div class="hp"><small data-hn>ARMOR</small><i><u data-hp></u></i></div><div class="pt"><small data-pn>PARTNER</small><i><u data-php></u></i></div><div class="dr"><small>DROPS</small><b data-dr>4</b></div></div>
@@ -365,17 +385,46 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   })();
   let ride: number = (o.ride ?? (saved === "tank" ? "tank" : "plane")) === "tank" ? TANK : PLANE;
   const mkUnit = (i: number): Unit => dbl({
-    i, kind: 0, name: "", color: "", you: false, x: 0, y: 0, a: -Math.PI / 2, ta: -Math.PI / 2, vx: 0, vy: 0, hp: 0, alive: false, dead: 0.4 + i * 0.5, drop: 0,
+    i, kind: 0, name: "", color: "", you: false, human: false, x: 0, y: 0, a: -Math.PI / 2, ta: -Math.PI / 2, vx: 0, vy: 0, hp: 0, alive: false, dead: 0.4 + i * 0.5, drop: 0,
     shield: 0, rapid: 0, triple: 0, strikes: 1, carpet: 0, rail: 3, charge: 0, chargeT: -1, heat: 0, hot: 0, cool: 0, kills: 0, deaths: 0,
     recoil: 0, flash: 0, tread: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, xp: 0, tier: 1, bite: 0, shots: 0,
   }, "x y a ta vx vy hp dead drop shield rapid triple charge heat hot cool recoil flash tread gx gy think xp bite");
-  /** You (crew[0]) and your partner (crew[1]). The seam for a second human: pilot() below. */
-  const crew: Unit[] = [mkUnit(0), mkUnit(1)];
-  const you = crew[0]!, mate = crew[1]!;
+  /** The crew: up to four humans (squad play) and the AI partner. Solo: you (crew[0]) and the AI
+   *  (crew[1]). A squad of two keeps an AI partner as the third ride; three or four play alone.
+   *  CN is how many are in the match. The seam: pilot() is the one place a ride's controls come from. */
+  const crew: Unit[] = Array.from({ length: 5 }, (_, i) => mkUnit(i));
+  // presence's step hands every person's input word for the frame here (squad play), then runs world().
+  let netIn: Uint32Array = new Uint32Array(Math.max(1, P));
+  let CN = 2, you = crew[0]!, mate = crew[1]!;
+  // Squad seats: humans in slot order with their seat colours, then (two humans) the AI partner.
+  const SEAT = ["#39ffb0", "#ff5c8f", "#19f0ff", "#ffc21a"];
+  /** The squad's roster from each person's ride (bit 9 of their input word, agreed in the countdown). */
+  function seat() {
+    CN = P === 2 ? 3 : P;
+    let planes = 0;
+    for (let i = 0; i < P; i++) planes += (netIn[i]! >>> 9) & 1;
+    for (let i = 0; i < CN; i++) {
+      const u = crew[i]!, hu = i < P;
+      // The AI partner takes the ride the two humans have fewer of (a tie: the one P1 didn't pick).
+      u.kind = hu ? (netIn[i]! >>> 9) & 1 : planes === 1 ? 1 - ((netIn[0]! >>> 9) & 1) : planes ? TANK : PLANE;
+      u.human = hu;
+      u.you = i === net!.slot;
+      u.name = hu ? `P${i + 1}` : RIDE_NAME[u.kind]!;
+      u.color = hu ? SEAT[i]! : RIDE_COLOR[u.kind]!;
+      u.hp = MAXHP[u.kind]!;
+      u.rail = u.kind === PLANE ? 2 : 3;
+    }
+    you = crew[net!.slot]!;
+    mate = crew[net!.slot ? 0 : 1]!;
+  }
   function cast() {
+    if (net) return seat();
     you.kind = ride;
     mate.kind = 1 - ride;
-    for (const u of crew) (u.name = RIDE_NAME[u.kind]!), (u.color = RIDE_COLOR[u.kind]!), (u.you = u === you && !demo), (u.hp = MAXHP[u.kind]!), (u.rail = u.kind === PLANE ? 2 : 3);
+    for (let i = 0; i < CN; i++) {
+      const u = crew[i]!;
+      (u.name = RIDE_NAME[u.kind]!), (u.color = RIDE_COLOR[u.kind]!), (u.you = u === you && !demo), (u.human = u === you && !demo), (u.hp = MAXHP[u.kind]!), (u.rail = u.kind === PLANE ? 2 : 3);
+    }
   }
   cast();
   const MAXF = 80;
@@ -410,8 +459,27 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const feedK = new Int16Array(8), feedV = new Int16Array(8);
   let feedN = 0, feedShown = 0, bannerN = 0, bannerShown = 0, bannerKind = 0, bannerV = 0, waveN = 0, waveShown = 0;
 
+  // Squad play: every peer plays the same 1100 × 640 arena, scaled to fit its screen (the view:
+  // scale, offset x, offset y). Drawing and input only; the match never knows. Solo: identity.
+  // A phone held upright turns the arena (view[3]), so its long side runs down the tall screen (Blitz).
+  const view = new Float64Array([1, 0, 0, 0]);
+  const wx = (x: number, y = input.pointer.y) => (view[3] ? y - view[2]! : x - view[1]!) / view[0]!, wy = (y: number, x = input.pointer.x) => (view[3] ? H - (x - view[1]!) / view[0]! : (y - view[2]!) / view[0]!);
+  /** Text about (x, y) reads upright on a turned view. */
+  const upright = (x: number, y: number) => view[3] && (ctx.translate(x, y), ctx.rotate(-Math.PI / 2), ctx.translate(-x, -y));
   function resize() {
     const r = wrap.getBoundingClientRect();
+    if (net) {
+      if (!cols) (W = 1100), (H = 640), (scale = 1.45), (T = 44), (cols = 25), (rows = 14), (area = 1), layBlocks();
+      const cw = Math.max(320, r.width), ch = Math.max(240, r.height);
+      dpr = Math.min(devicePixelRatio || 1, cw < 760 ? 1.5 : 2);
+      canvas.width = Math.round(cw * dpr);
+      canvas.height = Math.round(ch * dpr);
+      const turn = (view[3] = +(phone.matches && ch > cw)), aw = turn ? H : W, ah = turn ? W : H;
+      view[0] = Math.min(cw / aw, ch / ah);
+      view[1] = (cw - aw * view[0]) / 2;
+      view[2] = (ch - ah * view[0]) / 2;
+      return;
+    }
     W = Math.max(320, r.width);
     H = Math.max(240, r.height);
     dpr = Math.min(devicePixelRatio || 1, W < 760 ? 1.5 : 2);
@@ -522,10 +590,21 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
   }
 
+  /** u's nearest crew mate that's up (else the next one in the crew): where u respawns, who the AI sticks with. */
+  function buddy(u: Unit) {
+    let best = crew[(u.i + 1) % CN]!, bd = 1e18;
+    for (let i = 0; i < CN; i++) {
+      const v = crew[i]!;
+      if (v === u || !v.alive) continue;
+      const d = (v.x - u.x) * (v.x - u.x) + (v.y - u.y) * (v.y - u.y);
+      if (d < bd) (bd = d), (best = v);
+    }
+    return best;
+  }
   // ---------- Spawning: the tank parachutes in, the plane flies in ----------
   function spawn(u: Unit) {
     // Next to the other one if they're up, else low and centre (the enemies come from the top and sides).
-    const other = crew[1 - u.i]!, ax = other.alive ? other.x : W / 2 + (u.i ? 70 : -70), ay = other.alive ? other.y : H * 0.72;
+    const other = buddy(u), ax = other.alive ? other.x : W / 2 + (u.i % 2 ? 70 : -70) * (1 + (u.i >> 1)), ay = other.alive ? other.y : H * 0.72;
     for (let k = 0; k < 24; k++) {
       const a = R() * TAU, r = 50 + R() * 80;
       F[BX] = Math.max(40, Math.min(W - 40, ax + Math.cos(a) * r));
@@ -585,7 +664,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
    *  factories, the tank for walls, cores and armour. Auto-aim (you) treats everything the same. */
   function weightF(u: Unit, k: number) {
     const kd = k >= MAXF ? 4 + sites[k - MAXF]!.kind : foes[k]!.kind;
-    if (u.you) F[WT] = 1;
+    if (u.human) F[WT] = 1;
     else if (kd === FROG) F[WT] = 0.5;
     else if (u.kind === PLANE) F[WT] = kd === 4 + FACTORY ? 0.55 : kd === 4 + BASE ? 2.4 : kd === ALIEN || kd === FLY ? 0.6 : kd === ETANK ? 1.8 : 0.9;
     else F[WT] = kd === 4 + BASE ? 0.5 : kd === 4 + FACTORY ? 1.3 : kd === ETANK ? 0.55 : kd === BUG ? (foes[k]!.tier >= 3 ? 0.6 : 0.85) : 1.3;
@@ -644,16 +723,16 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (u.kind === TANK) {
       const len = 24 * scale, spreads = u.triple > 0 ? 3 : 1;
       for (let k = 0; k < spreads; k++) {
-        const a = u.ta + (spreads > 1 ? (k - 1) * 0.2 : 0) + (R() - 0.5) * (u.you ? 0.04 : 0.08);
+        const a = u.ta + (spreads > 1 ? (k - 1) * 0.2 : 0) + (R() - 0.5) * (u.human ? 0.04 : 0.08);
         F[SX] = u.x + Math.cos(a) * len;
         F[SY] = u.y + Math.sin(a) * len;
         ((F[SA] = a), (F[SS] = 600), (F[SL] = 1), shoot(u.i, false, K_SHELL));
       }
       u.recoil = 6;
       u.flash = 0.08;
-      u.cool = u.rapid > 0 ? 0.1 : u.you ? 0.19 : 0.3;
+      u.cool = u.rapid > 0 ? 0.1 : u.human ? 0.19 : 0.3;
       // The cannon is quick; hold it down too long and it overheats (rapid fire never does).
-      if (u.you && u.rapid <= 0 && (u.heat += 0.16) >= 1) (u.hot = 1.4), ((FQ[0] = u.x), (FQ[1] = u.y - 34), (FQ[2] = W_HOT), (FQ[3] = 2), (FQ[4] = 16), fxPush(FX_WORD));
+      if (u.human && u.rapid <= 0 && (u.heat += 0.16) >= 1) (u.hot = 1.4), ((FQ[0] = u.x), (FQ[1] = u.y - 34), (FQ[2] = W_HOT), (FQ[3] = 2), (FQ[4] = 16), fxPush(FX_WORD));
       ((FQ[0] = 1), (FQ[1] = u.x + Math.cos(u.ta) * len), (FQ[2] = u.y + Math.sin(u.ta) * len), (FQ[3] = 0), (FQ[4] = 0), (FQ[5] = 9), (FQ[6] = 0.12), (FQ[7] = 0), fxPush(FX_SPAWN));
       e.events.emit("shot", u.i);
       return;
@@ -666,7 +745,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       F[SY] = u.y + sa * 18 + ca * off;
       ((F[SA] = u.ta + fan + (R() - 0.5) * 0.03), (F[SS] = 780), (F[SL] = 0.72), shoot(u.i, false, K_BOLT));
     }
-    u.cool = (u.rapid > 0 ? 0.07 : TIER_COOL[u.tier]!) * (u.you ? 1 : 1.7);
+    u.cool = (u.rapid > 0 ? 0.07 : TIER_COOL[u.tier]!) * (u.human ? 1 : 1.7);
     u.flash = 0.05;
     e.events.emit("bolt", u.i);
   }
@@ -728,9 +807,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     u.run = 0;
     u.charge = 0;
     if (u.you) targeting = false;
-    // Your partner always comes back; you come back while there are DROPS (board), always elsewhere.
-    u.dead = u.you ? 2.4 : 3.5;
-    if (u.you && !embed && !demo) {
+    // The AI partner always comes back; people come back while there are DROPS (board), always elsewhere.
+    u.dead = u.human ? 2.4 : 3.5;
+    if (u.human && !embed && !demo) {
       if (G[DROPS]! <= 0) G[OUT_T] = 1.6;
       else G[DROPS]!--;
     }
@@ -953,7 +1032,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ((FQ[0] = cx), (FQ[1] = cy), (FQ[2] = 2.6), (FQ[3] = 3), boomQ());
       ((FQ[0] = cx), (FQ[1] = cy - 26), (FQ[2] = W_MINE), (FQ[3] = 3), (FQ[4] = 20), fxPush(FX_WORD));
       // A mine hurts everything on the ground nearby: your tank, bugs, enemy tanks.
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < CN; i++) {
         const v = crew[i]!;
         if (v.kind === TANK && Math.sqrt((v.x - cx) * (v.x - cx) + (v.y - cy) * (v.y - cy)) < 80 * (scale / 1.4)) damage(v, 2);
       }
@@ -1026,7 +1105,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         const s = sites[i]!;
         if (s.on && Math.abs(s.x - F[AX]!) < (s.w + w) / 2 + 60 && Math.abs(s.y - F[AY]!) < (s.h + h) / 2 + 60) ok = false;
       }
-      for (let i = 0; i < 2 && ok; i++) if (crew[i]!.alive && Math.sqrt((crew[i]!.x - F[AX]!) * (crew[i]!.x - F[AX]!) + (crew[i]!.y - F[AY]!) * (crew[i]!.y - F[AY]!)) < 220) ok = false;
+      for (let i = 0; i < CN && ok; i++) if (crew[i]!.alive && Math.sqrt((crew[i]!.x - F[AX]!) * (crew[i]!.x - F[AX]!) + (crew[i]!.y - F[AY]!) * (crew[i]!.y - F[AY]!)) < 220) ok = false;
       if (ok) return;
     }
   }
@@ -1311,7 +1390,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function ai(u: Unit) {
     const dt = G[DTS]!;
     if (dodge(u)) return;
-    const other = crew[1 - u.i]!;
+    const other = buddy(u);
     u.think -= dt;
     if (u.think <= 0) {
       u.think = 0.4 + R() * 0.5;
@@ -1355,6 +1434,61 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (u.cool <= 0 && u.charge <= 0 && err < 0.14 && F[HO]! < (u.kind === PLANE ? 520 : 470)) fire(u);
     } else (F[TT] = u.a), (F[TM] = 3 * dt), turretF(u);
   }
+  // ---------- Squad play: one 32-bit input word per person per frame ----------
+  // Bits 0-1 drive x (1 left, 2 right), 2-3 drive y (1 up, 2 down), 4 fire, 5 the special (long shot
+  // or salvo), 6 an airstrike at the pointer, 7-8 aim (0 the pointer, 1 auto, 2 along the hull),
+  // 9 the ride (0 tank, 1 plane: read in the countdown), 16-23 / 24-31 the pointer in 256ths of the
+  // arena. Every peer runs the same human() on the same words (Blitz's net play).
+  function human(u: Unit, b: number) {
+    const dt = G[DTS]!, mx = b & 3, my = (b >>> 2) & 3, am = (b >>> 7) & 3;
+    const px = (((b >>> 16) & 255) + 0.5) * (W / 256), py = (((b >>> 24) & 255) + 0.5) * (H / 256);
+    (F[DX] = mx === 1 ? -1 : mx === 2 ? 1 : 0), (F[DY] = my === 1 ? -1 : my === 2 ? 1 : 0), (F[DT] = dt), drive(u);
+    const aim = am === 1 ? pick(u, u.x, u.y, 520) : -1;
+    if (aim >= 0 && where(aim)) (F[TT] = Math.atan2(F[QY]! - u.y, F[QX]! - u.x)), (F[TM] = (u.kind === PLANE ? 12 : 8) * dt), turretF(u);
+    else if (am === 0) (F[TT] = Math.atan2(py - u.y, px - u.x)), (F[TM] = (u.kind === PLANE ? 14 : 10) * dt), turretF(u);
+    else (F[TT] = u.a), (F[TM] = 4 * dt), turretF(u);
+    if (b & 16 && u.cool <= 0 && u.hot <= 0 && u.charge <= 0) fire(u);
+    if (b & 32) charge(u, aim >= 0 ? aim : pick(u, px, py, 9999));
+    if (b & 64) (F[KX] = px), (F[KY] = py), callStrike(u.i);
+  }
+  /** This screen's controls as one input word (taps are spent here, once). */
+  function encode() {
+    let ax = input.axis("left", "right", 0), ay = input.axis("up", "down", 1);
+    const touch = input.stick.active || coarse.matches;
+    // A turned view: up on the screen is left in the arena, right on the screen is up.
+    if (view[3]) (ay = -ax), (ax = input.axis("up", "down", 1));
+    let b = (ax < -0.3 ? 1 : ax > 0.3 ? 2 : 0) | ((ay < -0.3 ? 1 : ay > 0.3 ? 2 : 0) << 2);
+    if (!targeting && (input.down("fire") || input.pointer.down || fireQ)) b |= 16;
+    fireQ = false;
+    if (longQ) (longQ = false), (b |= 32);
+    if (strikeT) (strikeT = false), (targeting = !targeting && you.strikes > 0);
+    let x = wx(input.pointer.x), y = wy(input.pointer.y);
+    if (strikeQ) (strikeQ = false), (targeting = false), (b |= 64), (x = wx(strikeX, strikeY)), (y = wy(strikeY, strikeX));
+    if (you.strikes <= 0) targeting = false;
+    b |= (autoOn || lockOn ? 1 : !touch || input.pointer.down ? 0 : 2) << 7;
+    b |= ride << 9;
+    const qx = Math.max(0, Math.min(255, Math.floor((x / W) * 256))), qy = Math.max(0, Math.min(255, Math.floor((y / H) * 256)));
+    return (b | (qx << 16) | (qy << 24)) >>> 0;
+  }
+  // A hash of the match (the crew, every foe and site, the clock, the random's state), compared
+  // across peers every 30 frames: a desync shows up as the first frame that differs.
+  const hb = new Float64Array(1), hbytes = new Uint8Array(hb.buffer), hs = new Uint32Array(1);
+  function mix(v: number) {
+    hb[0] = v;
+    for (let i = 0; i < 8; i++) hs[0] = Math.imul(hs[0]! ^ hbytes[i]!, 16777619);
+  }
+  function worldHash() {
+    hs[0] = 0x811c9dc5;
+    mix(R.state), mix(G[WAVE]!), mix(G[PHASE]!), mix(G[SCORE]!), mix(G[DROPS]!), mix(state === "play" ? 1 : state === "count" ? 2 : state === "end" ? 3 : 0);
+    for (let i = 0; i < CN; i++) {
+      const u = crew[i]!;
+      mix(u.kind), mix(u.x), mix(u.y), mix(u.ta), mix(u.hp), mix(u.alive ? 1 : 0), mix(u.kills), mix(u.rail), mix(u.strikes);
+    }
+    for (let i = 0; i < MAXF; i++) if (foes[i]!.on) mix(foes[i]!.x), mix(foes[i]!.y), mix(foes[i]!.hp);
+    for (let i = 0; i < SITES; i++) if (sites[i]!.on) mix(sites[i]!.hp);
+    for (let i = 0; i < shells.length; i++) if (shells[i]!.on) mix(shells[i]!.x);
+    return hs[0]! >>> 0;
+  }
   /** A frog has its tongue on u's spot (the tell): u gets out of the way. True while it's dodging. */
   function dodge(u: Unit) {
     for (let i = 0; i < MAXF; i++) {
@@ -1373,8 +1507,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
    * input word for crew[1] instead of calling ai(). Nothing else in the match knows who drives.
    */
   function pilot(u: Unit) {
-    if (u.you) player();
-    else ai(u);
+    if (!u.human) ai(u);
+    else if (net) human(u, netIn[u.i]!);
+    else player();
   }
 
   // ---------- Foes ----------
@@ -1382,7 +1517,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function nearestRide(o: { x: number; y: number }, ground: boolean) {
     const x = o.x, y = o.y;
     let best = -1, bd = 1e9;
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < CN; i++) {
       const u = crew[i]!;
       if (!u.alive || u.drop < 1 || (ground && u.kind === PLANE)) continue;
       const d = Math.sqrt((u.x - x) * (u.x - x) + (u.y - y) * (u.y - y));
@@ -1564,7 +1699,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if ((f.think -= dt) <= 0) {
         f.mode = 2;
         f.think = 0.25;
-        for (let k = 0; k < 2; k++) {
+        for (let k = 0; k < CN; k++) {
           const u = crew[k]!;
           if (!u.alive || u.drop < 1) continue;
           const dx = u.x - f.gx, dy = u.y - f.gy;
@@ -1625,7 +1760,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (s.hp <= 0) {
       // A taken base repairs your rides parked in it (Sherman Bytes: friendly bases repair).
       if (s.kind === BASE && s.won)
-        for (let i = 0; i < 2; i++) {
+        for (let i = 0; i < CN; i++) {
           const u = crew[i]!;
           if (u.alive && u.drop >= 1 && u.hp < MAXHP[u.kind]! && Math.abs(u.x - s.x) < s.w && Math.abs(u.y - s.y) < s.h * 1.6 && (s.cool -= dt) <= 0)
             (s.cool = 1.2), u.hp++, ((FQ[0] = u.x), (FQ[1] = u.y - 30), (FQ[2] = W_REPAIR), (FQ[3] = 5), (FQ[4] = 14), fxPush(FX_WORD));
@@ -1674,7 +1809,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   }
   /** A ride sits on block b: cover can't grow back yet. */
   function rideOn(b: Block) {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < CN; i++) {
       const u = crew[i]!;
       if (u.alive && u.kind === TANK && u.x > b.x - 20 && u.x < b.x + b.w + 20 && u.y > b.y - 20 && u.y < b.y + b.h + 20) return true;
     }
@@ -1697,7 +1832,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (input.hit("auto")) autoOn = !autoOn;
       if (input.hit("lock")) (lockOn = !lockOn), (lockT = -1);
     },
-    step: (_, dt) => (state === "paused" || G[RES]! > 0 || supply.system.step!(e, dt), world(dt)),
+    // Squad play: presence runs world() once per lockstep frame instead.
+    step: net ? undefined : (_, dt) => (state === "paused" || G[RES]! > 0 || supply.system.step!(e, dt), world(dt)),
     render() {
       fxPlay();
       for (let i = 0; i < e.events.size; i++) {
@@ -1715,10 +1851,16 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     },
   });
   e.remove(supply.system);
+  const link = net
+    ? lockstep!(e, { transport: net.transport, slot: net.slot, players: P, delay: net.delay ?? 3, input: net.input ?? encode, step: (_, ins) => ((netIn = ins), world(e.dt)), hash: worldHash })
+    : null;
 
   /** One fixed step of the match. */
   function world(dt: number) {
     G[DTS] = dt; // the step's length, for the helpers (a number passed to a call is boxed)
+    if (net && state === "play" && G[RES]! <= 0) supply.system.step!(e, dt);
+    // Squad play: everyone's ride, read from their words through the countdown (the same frame on every peer).
+    if (net && state === "count") seat();
     G[MATCH]! += dt;
     fx.step(dt);
     G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
@@ -1801,7 +1943,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   }
   /** Your rides: respawn, land, timers, controls, pickups. */
   function ridesStep() {
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < CN; i++) {
       const u = crew[i]!;
       if (!u.alive || u.drop < 1) rideIn(u);
       else rideStep(u), pickups(u);
@@ -1860,16 +2002,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     for (let k = supply.count - 1; k >= 0; k--) if (supply.landed(k) && ((F[HX] = supply.x[k]! - u.x), (F[HY] = supply.y[k]! - u.y), hyp(), F[HO]! < 26 * scale)) takeCrate(k, u);
     if (embed) for (const c of covers) if (u.kind === TANK && inRect(u.x, u.y, c.x, c.y + c.h * 0.2, c.w, c.h * 0.7)) knock(c, 0, 0, 1, true);
   }
-  /** The two rides keep a little apart (a tank can't sit inside the plane's shadow forever). */
+  /** The rides keep a little apart (a tank can't sit inside a plane's shadow forever): the plane gives way. */
   function apart() {
-    if (you.alive && mate.alive && you.drop >= 1 && mate.drop >= 1) {
-      const dx = mate.x - you.x, dy = mate.y - you.y, d = Math.sqrt(dx * dx + dy * dy), min = 30 * scale;
-      if (d > 0 && d < min) {
-        const k = (min - d) / 2 / d;
-        if (you.kind === TANK) (mate.x += dx * k * 2), (mate.y += dy * k * 2);
-        else (you.x -= dx * k * 2), (you.y -= dy * k * 2);
+    for (let i = 0; i < CN; i++)
+      for (let j = i + 1; j < CN; j++) {
+        const a = crew[i]!, b = crew[j]!;
+        if (!a.alive || !b.alive || a.drop < 1 || b.drop < 1) continue;
+        const dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy), min = 30 * scale;
+        if (d <= 0 || d >= min) continue;
+        const k = (min - d) / d;
+        if (a.kind === TANK) (b.x += dx * k), (b.y += dy * k);
+        else (a.x -= dx * k), (a.y -= dy * k);
       }
-    }
   }
   /** Foes and sites: their moves, contact, the factories and bases. */
   function foesStep() {
@@ -1886,7 +2030,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (!f.on) continue;
       // Contact: bugs bite, flies sting, a small frog bites; your tank squashes small bugs.
       if (f.kind === BUG || f.kind === FLY || (f.kind === FROG && f.eaten < 4))
-        for (let k = 0; k < 2; k++) {
+        for (let k = 0; k < CN; k++) {
           const u = crew[k]!;
           if (!u.alive || u.drop < 1) continue;
           F[HX] = u.x - f.x;
@@ -1930,7 +2074,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (s.foe) {
         // Enemy fire: alien bolts and flak hit both rides; tank shells only your tank.
         F[SR] = (s.kind === K_FLAK ? 22 : 14) * scale;
-        for (let k = 0; k < 2 && !done; k++) {
+        for (let k = 0; k < CN && !done; k++) {
           const u = crew[k]!;
           if (!u.alive || u.drop < 1 || (s.kind === K_ETANK && u.kind === PLANE)) continue;
           if (((F[QX] = u.x), (F[QY] = u.y), sweep(s))) {
@@ -2024,7 +2168,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         return;
       }
       if (lockOn) {
-        const k = pick(you, x, y, 44 * (scale / 1.4));
+        const k = pick(you, wx(x, y), wy(y, x), 44 * (scale / 1.4));
         if (k >= 0 && k !== lockT && where(k)) {
           ev.stopPropagation();
           lockT = k;
@@ -2054,7 +2198,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     $<HTMLElement>("[data-ll]").textContent = plane ? "SALVO" : "LONG";
     keys.long.setAttribute("aria-label", plane ? "Salvo: four homing rockets (E)" : "Long shot: locks on and hits from across the field (E)");
     keys.long.title = plane ? "E · Salvo" : "E · Long shot";
-    $<HTMLElement>("[data-help]").textContent = `WASD ${plane ? "FLY" : "DRIVE"} · MOUSE AIM · CLICK FIRE · E ${plane ? "SALVO" : "LONG SHOT"} · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : " · ESC/P PAUSE"}`;
+    $<HTMLElement>("[data-help]").textContent = `WASD ${plane ? "FLY" : "DRIVE"} · MOUSE AIM · CLICK FIRE · E ${plane ? "SALVO" : "LONG SHOT"} · F AIRSTRIKE · Q AUTO · T LOCK${embed ? " · ESC CLOSE" : net ? "" : " · ESC/P PAUSE"}`;
     wrap.style.setProperty("--team", you.color);
     wrap.style.setProperty("--pc", mate.color);
     hud.pn.textContent = mate.name;
@@ -2104,6 +2248,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     over.hidden = true;
     over.innerHTML = "";
     G[WAVE] = 1;
+    if (net) rideKeys(); // the squad's rides are settled now
     startWave();
   }
   function end(won: boolean, surrendered = false) {
@@ -2111,15 +2256,17 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     targeting = false;
     const sc = Math.round(G[SCORE]!), wave = Math.min(G[WAVE]!, WAVES);
     e.events.emit(won ? "win" : "end", 0);
-    const rows = `<div class="big you"><span>SCORE</span><span>${sc}</span></div><div><span>WAVES</span><span>${won ? WAVES : wave - 1} / ${WAVES}</span></div><div class="you"><span>YOU · ${you.name}</span><span>${you.kills} K · ${you.deaths} D</span></div><div><span>PARTNER · ${mate.name}</span><span>${mate.kills} K · ${mate.deaths} D</span></div>`;
+    // Solo: you and your partner. Squad: everyone in the crew, you marked.
+    const who = net ? crew.slice(0, CN) : [you, mate];
+    const rows = `<div class="big you"><span>SCORE</span><span>${sc}</span></div><div><span>WAVES</span><span>${won ? WAVES : wave - 1} / ${WAVES}</span></div>` + who.map((u) => `<div class="${u.you ? "you" : ""}"><span>${u.you ? "YOU" : net ? (u.human ? "SQUAD" : "AI") : "PARTNER"} · ${u.name}${net && u.human ? ` · ${RIDE_NAME[u.kind]}` : ""}</span><span>${u.kills} K · ${u.deaths} D</span></div>`).join("");
     overlay(
       won ? "STAGE CLEAR" : surrendered ? "WHITE FLAG" : "INSERT COIN",
       won ? "YOU WIN" : surrendered ? "GAME OVER" : `WAVE ${wave} WINS`,
-      `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>PLAY AGAIN</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${MENU}<b>SWAP RIDES</b></button>`,
+      net ? (net.leave ? `<button class="bui-sticker-key" type="button" data-new>${MENU}<b>BACK TO THE ROOM</b></button>` : "") : `<button class="bui-sticker-key" type="button" data-again>${PLAY}<b>PLAY AGAIN</b></button><button class="bui-sticker-key bui-second" type="button" data-new>${MENU}<b>SWAP RIDES</b></button>`,
       `<div class="table">${rows}</div>`,
     );
-    ov.querySelector("[data-again]")!.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
-    ov.querySelector("[data-new]")!.addEventListener("click", () => toIntro(), { signal: e.signal });
+    ov.querySelector("[data-again]")?.addEventListener("click", () => (closeOverlay(), rematch()), { signal: e.signal });
+    ov.querySelector("[data-new]")?.addEventListener("click", () => (net ? net.leave?.() : toIntro()), { signal: e.signal });
     o.onEnd?.({ won, score: sc, wave, ride: RIDE_NAME[ride] === "TANK" ? "tank" : "plane", kills: G[KILLS]!, surrendered });
   }
   /** A fresh match: the board, the crew, the waves. */
@@ -2160,6 +2307,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const BYLINE = `<p class="by">DOM CROSSFIRE · BY CHRIS COOLEY · BUILT ON FIZLET · <a href="https://domvirus.com/legal/privacy/">PRIVACY</a></p>`;
   /** Pause (Blitz): RESUME (a short countdown first), RESTART, QUIT TO MENU, and the white flag. */
   function togglePause() {
+    if (net) return; // a squad match can't stop one screen: no pause in squad play
     if (state === "play") {
       state = "paused";
       targeting = false;
@@ -2180,7 +2328,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     } else if (state === "paused") (closeOverlay(), (state = "play"), (G[RES] = RESUME));
   }
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden" && !embed && !demo && state === "play") togglePause();
+    if (document.visibilityState === "hidden" && !embed && !demo && !net && state === "play") togglePause();
   }, { signal: e.signal });
 
   // ---------- HUD (change-only writes, render phase) ----------
@@ -2540,7 +2688,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     ctx.textBaseline = "alphabetic";
   }
   function draw() {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (net) ctx.setTransform(1, 0, 0, 1, 0, 0), ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (view[3]) ctx.setTransform(0, dpr * view[0]!, -dpr * view[0]!, 0, dpr * (view[1]! + H * view[0]!), dpr * view[2]!);
+    else ctx.setTransform(dpr * view[0]!, 0, 0, dpr * view[0]!, dpr * view[1]!, dpr * view[2]!);
     ctx.clearRect(0, 0, W, H);
     const sh = calm.matches ? 0 : G[QUAKE]!, sx = sh ? (shakeRandom() - 0.5) * sh : 0, sy = sh ? (shakeRandom() - 0.5) * sh : 0;
     shook = Math.abs(sx) + Math.abs(sy);
@@ -2834,7 +2984,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.fillRect(you.x - 18, you.y + 25 * scale, 36 * (you.hot > 0 ? 1 : you.heat), 4);
     }
     if (targeting && (fine.matches || input.pointer.x || input.pointer.y)) {
-      const x = input.pointer.x, y = input.pointer.y, r = (62 + 5 * Math.sin(now * 5)) * (scale / 1.4);
+      const x = wx(input.pointer.x), y = wy(input.pointer.y), r = (62 + 5 * Math.sin(now * 5)) * (scale / 1.4);
       reticle(x, y, r, now, 1);
       ctx.font = "900 12px ui-monospace,monospace";
       ctx.lineWidth = 4;
@@ -2846,7 +2996,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       ctx.strokeStyle = you.color;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.arc(input.pointer.x, input.pointer.y, 9, 0, TAU);
+      ctx.arc(wx(input.pointer.x), wy(input.pointer.y), 9, 0, TAU);
       ctx.stroke();
     }
   }
@@ -2915,18 +3065,20 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function tag(u: Unit) {
     const lift = u.drop < 1 ? (1 - u.drop) * (u.kind === PLANE ? 140 : 150) + (u.kind === TANK ? 70 * scale : 20) : 0;
     const ty = u.y - lift - 27 * scale - 6;
+    ctx.save();
+    upright(u.x, u.y);
     ctx.font = `800 ${u.you ? 12 : 10}px ui-monospace,monospace`;
     ctx.textAlign = "center";
     ctx.lineWidth = 3;
     ctx.strokeStyle = lightTheme ? "#f6f3ff" : "#07060f";
-    const t = demo ? u.name : u.you ? "▼ YOU" : `▲ ${u.name} · AI`;
+    const t = demo ? u.name : u.you ? "▼ YOU" : u.human ? `▲ ${u.name}` : `▲ ${u.name} · AI`;
     ctx.strokeText(t, u.x, ty);
     ctx.fillStyle = u.color;
     ctx.fillText(t, u.x, ty);
     if (u.drop >= 1) {
       const m = MAXHP[u.kind]!;
       for (let k = 0; k < m; k++) (ctx.fillStyle = k < u.hp ? (u.hp <= 2 ? "#ff2b4e" : u.color) : "rgba(174,164,214,.3)"), ctx.fillRect(u.x - (m * 7) / 2 + k * 7, ty + 4, 5, 3);
-    }
+    }    ctx.restore();
   }
 
   // ---------- Wiring: the round keys (Blitz) ----------
@@ -3035,6 +3187,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   G[CRATE_IN] = 14;
   // The attract match plays the finale (all four armies on the board), again and again.
   if (embed || demo) (G[WAVE] = demo ? FINALE : 1), startWave();
+  else if (net) countdown(); // every peer starts the countdown on frame 0
   else intro();
   e.start();
 
@@ -3043,6 +3196,12 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     get state() {
       return state;
     },
+    /** Squad play: the lockstep frame, stalls, the first desynced frame (-1) and who left; or null. */
+    get net() {
+      return link;
+    },
+    /** A hash of the match (squad play compares it across peers). */
+    hash: worldHash,
     /** Start the match (from the start screen: the countdown, then wave 1). */
     start: () => (state === "intro" ? countdown() : undefined),
     get ride(): Ride {
@@ -3068,7 +3227,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     },
     /** Debug / tests: the live world. */
     world: {
-      crew, foes, sites, shells, tiles, blocks, bombers, bombs, marks,
+      get crew() {
+        return crew.slice(0, CN);
+      },
+      foes, sites, shells, tiles, blocks, bombers, bombs, marks,
       get pellets() {
         return pellets;
       },

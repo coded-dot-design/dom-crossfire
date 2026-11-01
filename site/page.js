@@ -4,22 +4,12 @@
 //   [data-launch-link] PLAY keys: the kit's launch burst, then the play page
 //   [data-drop]       drop the game onto the landing itself (the page becomes the arena)
 //   #cf               the play page's board match
-import { pressCue, launch } from "../vendor/fizlet/ui/board-ui";
-import { lockTouch } from "../vendor/fizlet/touch";
+import { launch } from "../vendor/fizlet/ui/board-ui";
+import { chrome, gameMode } from "./chrome.js";
 import { createCrossfire, install } from "./dom-crossfire.mjs";
 
-const html = document.documentElement;
+chrome();
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
-pressCue(document); // page keys: keyboard press and iOS :active (Fizlet BOARD-UI.md "Page keys")
-lockTouch(document); // a pinch on the hero battle or the game never zooms the page
-// Light or dark: shared with the game and the DOM VIRUS family (localStorage "dom-virus:theme").
-document.querySelector("[data-theme-toggle]")?.addEventListener("click", () => {
-  const next = html.dataset.theme === "light" ? "dark" : "light";
-  html.dataset.theme = next;
-  try {
-    localStorage.setItem("dom-virus:theme", next);
-  } catch {}
-});
 
 // The landing's hero: a live co-op battle behind the copy (none with reduced motion).
 const demoHost = document.getElementById("cf-demo");
@@ -48,20 +38,5 @@ document.querySelector("[data-drop]")?.addEventListener("click", () => {
 const host = document.getElementById("cf");
 if (host) {
   window.crossfire = createCrossfire(host, { mode: "board" });
-  const game = matchMedia("(pointer: coarse) and (max-width: 900px), (pointer: coarse) and (max-height: 500px)"), vv = window.visualViewport;
-  const fit = () => {
-    if (!game.matches) return;
-    if (vv) html.style.setProperty("--app-h", vv.height + "px"), html.style.setProperty("--app-top", vv.offsetTop + "px");
-    if (scrollX || scrollY) scrollTo(0, 0);
-  };
-  if (vv) vv.addEventListener("resize", fit), vv.addEventListener("scroll", fit);
-  addEventListener("scroll", fit, { passive: true });
-  addEventListener("orientationchange", fit);
-  fit();
-  for (const t of ["gesturestart", "gesturechange", "dblclick"]) document.addEventListener(t, (e) => matchMedia("(pointer: coarse)").matches && e.preventDefault(), { passive: false });
-  document.addEventListener("touchmove", (e) => {
-    if (!game.matches || e.touches.length > 1) return;
-    for (const n of e.composedPath()) if (n.matches?.("[data-scroll]") && n.scrollHeight > n.clientHeight) return;
-    if (e.cancelable) e.preventDefault();
-  }, { capture: true, passive: false });
+  gameMode();
 }

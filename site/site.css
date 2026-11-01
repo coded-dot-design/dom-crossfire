@@ -992,3 +992,291 @@ html.bui[data-theme="light"] .cf-ride-head .eyebrow b {
 .cf-army .eyebrow {
   display: block;
 }
+
+/* ---------- The squad page (play/squad/): Battlefield Blitz's room card, over the board ---------- */
+.squad {
+  overflow: hidden;
+}
+.room.bui-card {
+  --u: 1px;
+  position: absolute;
+  z-index: 40;
+  left: max(12px, env(safe-area-inset-left));
+  top: max(64px, calc(env(safe-area-inset-top) + 56px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  width: min(calc(100% - 24px), 340px);
+  max-height: calc(100% - 80px);
+  padding: 12px 14px 14px;
+}
+.room .head {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas: "dot title" "dot sub";
+  align-items: center;
+  column-gap: 10px;
+}
+.room .head b {
+  grid-area: title;
+  font: 900 15px/1.1 var(--mono);
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+.room .head small {
+  grid-area: sub;
+  font: 800 10px/1.3 var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+/* The link state: off (grey), waiting (blinking system), live (team), slow (fire), lost (attack). */
+.room .dot {
+  grid-area: dot;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--rim);
+  border-radius: 50%;
+  background: var(--line);
+}
+.room[data-conn="wait"] .dot {
+  background: var(--k-sys);
+  animation: cf-blink 1s steps(2) infinite;
+}
+.room[data-conn="live"] .dot {
+  background: var(--team);
+}
+.room[data-conn="slow"] .dot {
+  background: var(--k-fire);
+  animation: cf-blink 0.5s steps(2) infinite;
+}
+.room[data-conn="lost"] .dot {
+  background: var(--k-attack);
+}
+@keyframes cf-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+.room .body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+.room .step {
+  display: none;
+  gap: 12px;
+}
+.room[data-step="join"] [data-for="join"],
+.room[data-step="wait"] [data-for="wait"],
+.room[data-step="play"] [data-for="play"],
+.room[data-step="gone"] [data-for="gone"] {
+  display: grid;
+}
+.room .step label,
+.room .pick > span {
+  display: grid;
+  gap: 6px;
+  font: 800 11px/1 var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.room .step input {
+  min-height: 48px;
+  padding: 0 14px;
+  font: 800 17px/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2.5px solid var(--line);
+  border-radius: 8px;
+}
+.room .step input::placeholder {
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.room .pick {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.room .rides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.room .rides .bui-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 12px;
+  font: 900 13px/1 var(--mono);
+  letter-spacing: 0.1em;
+}
+.room .rides img {
+  image-rendering: pixelated;
+}
+.room .rooms {
+  display: grid;
+  grid-template-columns: 48px 52px 48px;
+  align-items: center;
+  gap: 8px;
+}
+.room .rooms .bui-key {
+  width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  font: 900 20px/1 var(--mono);
+}
+.room .rooms output {
+  font: 900 26px/1 var(--mono);
+  text-align: center;
+  color: var(--ink);
+}
+.room .step .bui-sticker-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 52px;
+  padding: 8px 14px;
+}
+.room .step .bui-sticker-key[hidden] {
+  display: none;
+}
+.room .step .bui-sticker-key svg {
+  width: 22px;
+  height: 22px;
+}
+.room .step .bui-sticker-key b {
+  font-size: 14px;
+  letter-spacing: 0.16em;
+}
+.room .keys {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.room .say {
+  margin: 0;
+  font: 700 13px/1.3 var(--mono);
+  color: var(--k-attack);
+}
+.room .say:empty {
+  display: none;
+}
+.room .big {
+  margin: 0;
+  font: 800 15px/1.4 var(--mono);
+}
+.room .word {
+  margin: 0;
+  font: 900 22px/1 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--k-attack);
+}
+.room .fine {
+  margin: 0;
+  font: 12px/1.45 var(--mono);
+  color: var(--muted);
+}
+/* Seats and the squad's scoreboard: each seat's swatch is its ride's colour. */
+.room .sw {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  background: var(--c);
+  border: 2px solid var(--rim);
+  border-radius: 4px;
+}
+.room .seats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.room .seats li {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 10px;
+  font: 800 11px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: 8px;
+}
+.room .seats li.me {
+  border-color: var(--team);
+}
+.room .seats li.open {
+  color: var(--muted);
+  border-style: dashed;
+}
+.room .seats li.open .sw {
+  animation: cf-blink 1s steps(2) infinite;
+}
+.room .score {
+  width: 100%;
+  border-collapse: collapse;
+  font: 800 13px/1 var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.room .score :is(th, td) {
+  padding: 7px 4px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+}
+.room .score thead th:first-child,
+.room .score tbody th {
+  text-align: left;
+}
+.room .score thead th {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+}
+.room .score tbody th {
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.room .score tr.you th {
+  color: var(--team-ink);
+}
+html.bui[data-theme="light"] .room .score tr.you th {
+  color: color-mix(in srgb, var(--team-ink) 35%, var(--ink));
+}
+.room .score tr.down {
+  opacity: 0.55;
+}
+@media (prefers-reduced-motion: reduce) {
+  .room .dot,
+  .room .seats li.open .sw {
+    animation: none;
+  }
+}
+/* Phones in a match: the card folds to its header (tap it to open), so the board has the screen. */
+@media (pointer: coarse), (max-width: 760px) {
+  .room[data-step="play"]:not(.open) .body {
+    display: none;
+  }
+  .room[data-step="play"] .head {
+    cursor: pointer;
+  }
+  /* Under the game's scoreboard, not over it. */
+  .room[data-step="play"] {
+    top: max(122px, calc(env(safe-area-inset-top) + 112px));
+  }
+}
