@@ -10,7 +10,7 @@
   arena scaled to fit, the match hash compared every 30 frames. Blitz's room card (invite code, your
   ride, room; four seats; P1's START NOW with two or three in; the squad's rides and kills; someone
   left). The room server is the same one Blitz uses; Crossfire's rooms are its 8 to 15.
-- A new build, `dist/dom-crossfire-net.mjs` (the module plus squad play): 55,186 B gzip, budget
+- A new build, `dist/dom-crossfire-net.mjs` (the module plus squad play): 55,191 B gzip, budget
   55,424 B. The solo builds carry the seats, the input word and the hash (+1.5 KB, as Blitz's do).
 - Tests: `test:lockstep` (2, 3 and 4 people identical frame for frame, a slow jittered link plays
   the very same match, the same seed replays it, 0 desyncs, 0 Math.random) and `tests/squad.mjs`

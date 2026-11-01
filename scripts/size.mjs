@@ -7,8 +7,8 @@
 // 0.3.0 (four waves a section, mini-bosses, Byte Runner flipped: the frog, pellets on blocks): measured
 // 52,035 / 52,071 B (+1,287 / +1,277); budgets 51,200 → 52,480.
 // 0.4.0 (squad play): the solo builds carry the squad seats, the input word and the match hash (as
-// Blitz's do): 53,572 / 53,635 B (+1,537 / +1,564), budgets 53,760. dom-crossfire-net.mjs (the module
-// plus @fzlt/core/presence and the room join) 55,186 B, budget 55,424. squad.js (the room card) 3,255 B.
+// Blitz's do): 53,575 / 53,638 B (+1,540 / +1,567), budgets 53,760. dom-crossfire-net.mjs (the module
+// plus @fzlt/core/presence and the room join) 55,191 B, budget 55,424. squad.js (the room card) 3,255 B.
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";
 let failed = false;
