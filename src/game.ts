@@ -549,7 +549,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     u.hp = MAXHP[u.kind]!;
     u.alive = true;
     u.drop = u.shield = u.rapid = u.triple = u.recoil = u.think = u.charge = u.heat = u.hot = u.run = u.bite = 0;
-    u.cool = 0.6;
+    u.cool = 0; // the guns are ready the moment you land: a held click fires at once (the landing shield covers you)
     u.target = u.chargeT = -1;
     u.gx = u.x;
     u.gy = u.y;
@@ -1727,7 +1727,6 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       }
       if (u.drop < 1) {
         u.drop = Math.min(1, u.drop + dt / (u.kind === PLANE ? 1 : 1.5));
-        u.cool -= dt; // the guns are ready by the time you land: a held click fires at once
         if (u.drop >= 1) {
           u.shield = Math.max(u.shield, 1.2);
           puff(2, u.x, u.y, 22, 0.45, 7);

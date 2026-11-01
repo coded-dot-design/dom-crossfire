@@ -3,8 +3,8 @@
 ## 0.2.1
 
 - Click to fire on desktop: a held mouse button on the field fires from the moment you land, with
-  either ride. The guns now cool down during the parachute or fly-in, so the 0.6 s landing cooldown
-  no longer swallows a held click (Space already worked once it ran out).
+  either ride. The 0.6 s gun cooldown a ride used to land with is gone, so it no longer swallows a
+  held click (Space already worked once it ran out); the landing shield still covers you.
 - The scoreboard no longer takes the pointer (`pointer-events: none`; it has no keys of its own), so
   a click under it, mid-field, reaches the game. It no longer drags, either.
 - Browser test: a held click on the field fires, and a click under the scoreboard reaches the
