@@ -1,0 +1,51 @@
+{
+  "$comment": "astro-base-engine config for the DOM Crossfire site (a DOM VIRUS board game, by Chris Cooley; hub: https://domvirus.com/). Run the engine with --site site. brand.siteUrl is the live GitHub Pages address until crossfire.domvirus.com is pointed; targets.production carries the domain (fe launch checks it). The landing page is the game's own page at / (the brief's type is game), and it loads the game, so scripts are expected there. No analytics or tracking ids here.",
+  "brand": {
+    "name": "DOM Crossfire",
+    "siteUrl": "https://coded-dot-design.github.io/dom-crossfire",
+    "defaultImage": "/shots/og.png",
+    "author": {
+      "name": "Chris Cooley",
+      "url": "https://coded.design/"
+    }
+  },
+  "inputs": {
+    "voice": "../brand/voice.md",
+    "styleGuide": "../brand/style-guide.md"
+  },
+  "pageTypes": {
+    "game": {
+      "template": "marketing",
+      "path": "/",
+      "eyebrow": "Board game",
+      "schemaPageType": "VideoGame",
+      "schemaNameFromHeading": true,
+      "schemaDefaults": {
+        "gamePlatform": "Web browser",
+        "applicationCategory": "Game",
+        "isAccessibleForFree": true
+      },
+      "schemaFields": [
+        "codeRepository"
+      ],
+      "requires": [
+        "hero"
+      ]
+    }
+  },
+  "checks": {
+    "jsAllowed": [
+      "/"
+    ]
+  },
+  "dns": {
+    "owner": "coded-dot-design"
+  },
+  "targets": {
+    "production": {
+      "brand": {
+        "siteUrl": "https://crossfire.domvirus.com"
+      }
+    }
+  }
+}
