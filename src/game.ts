@@ -48,6 +48,18 @@ export interface CrossfireOptions {
 }
 
 const TAU = Math.PI * 2;
+/** Give an object's fractional fields the double representation from the start (keys space-separated):
+ *  a field V8 first saw as a small integer changes its map when it first holds a fraction, and every
+ *  step compiled against the old map deoptimizes (the step then allocates until it re-optimizes). */
+function dbl<T extends object>(o: T, keys: string): T {
+  const r = o as Record<string, number>;
+  for (const k of keys.split(" ")) {
+    const v = r[k]!;
+    r[k] = 0.5;
+    r[k] = v;
+  }
+  return o;
+}
 /** Length of (x, y) without Math.hypot's allocation (Blitz: bit for bit what V8's hypot returns). */
 function dist(x: number, y: number) {
   if (x < 0) x = -x;
@@ -73,7 +85,7 @@ const HURT = [
   [1, 0.5, 1.5, 0.5, 0.6, 1, 1],
   [1, 1, 0.34, 1, 1, 0.3, 0.2],
 ];
-const H_FACTORY = 5, H_CORE = 6, H_WALL = 7;
+const H_FACTORY = 4, H_CORE = 5, H_WALL = 6;
 // Power tiles (Blitz's blinking grid).
 const RAPID = 1, TRIPLE = 2, STRIKE = 3, SHIELD = 4, MINE = 5, HEAL = 6, AMMO = 7;
 const TILE_COLOR = ["", "#39ffb0", "#19f0ff", "#ff2e88", "#f6f3ff", "#ff2b4e", "#a8ff3e", "#ffc21a"];
@@ -216,7 +228,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 .bui .ride[aria-pressed=true]{border-color:var(--rc);background:color-mix(in srgb,var(--rc) 16%,var(--card));box-shadow:0 2px 0 var(--rim),0 0 26px color-mix(in srgb,var(--rc) 35%,transparent)}.ride[aria-pressed=true] small{color:var(--ink);opacity:.85}.ride[aria-pressed=true] b{color:var(--rc)}.bui[data-theme=light] .ride[aria-pressed=true] b{color:var(--ink)}.ride[aria-pressed=true] .pic{border-color:var(--rc)}
 .ride .you{position:absolute;top:-11px;right:10px;padding:3px 7px 2px;font:900 9px/1 ui-monospace,monospace;letter-spacing:.12em;color:var(--rim);background:var(--k-go);border:2px solid var(--rim);border-radius:5px;opacity:0;scale:.6;transition:opacity .15s,scale .15s}
 .ride[aria-pressed=true] .you{opacity:1;scale:1}
-.mate{margin:-12px 0 0;font:900 11px/1.3 ui-monospace,monospace;letter-spacing:.12em;color:var(--k-sys-ink);text-align:center}
+.mate{margin:-6px 0 0;font:900 11px/1.3 ui-monospace,monospace;letter-spacing:.12em;color:var(--k-sys-ink);text-align:center}
 .bui .ov [data-resume]{width:168px;height:96px}.bui .ov [data-resume] b{font-size:13px}
 .ov.pause .bui-overlay-keys{flex-wrap:wrap;justify-content:center;width:min(640px,calc(100% - 24px));bottom:max(20px,env(safe-area-inset-bottom))}
 .ov .by{flex-basis:100%;margin:0;text-align:center;font-size:10px;letter-spacing:.14em;color:#f6f3ff}.ov .by a{display:inline-block;padding:8px 2px;color:var(--k-sys)}
@@ -228,7 +240,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:cro
 @media (pointer:coarse){.pz span{display:none}.bui :is(.fs,.pz,.dk){width:44px;height:44px;padding:0;justify-content:center}.bui .pz{left:calc(max(12px,env(safe-area-inset-left)) + var(--bz-lead,0px) + 52px)}.pz svg{width:22px;height:22px}}
 @media (max-height:460px){.ov .table{top:57%;gap:2px;padding:6px 12px;font-size:10px}.ov.result .bui-sticker{top:20%}}
 .pre .hud,.pre .pad,.pre .help,.pre .feed,.aiming .help{display:none}
-@media (max-height:520px){.bz:not(.nofs) .legend{display:none}.over.intro{padding-top:0;gap:16px}.sticker b{font-size:34px}.sticker .ic{width:44px;height:44px}.ride .pic{width:44px;height:44px}.bui .ride{padding-block:6px}}
+@media (max-height:520px){.bz:not(.nofs) .legend{display:none}.over.intro{padding-top:0;gap:14px}.sticker b{font-size:34px}.sticker .ic{width:44px;height:44px}.ride .pic{width:40px;height:40px}.bui .ride{width:210px;padding-block:6px}.ride small{display:none}.mate{margin:0}.pick{gap:6px}}
 .table{display:grid;gap:4px;min-width:260px;padding:12px 16px;color:var(--ink);background:var(--surface);border:2px solid var(--line);border-radius:12px;box-shadow:0 5px 0 var(--rim)}
 .table div{display:flex;justify-content:space-between;gap:20px}.table .you{color:var(--team)}.bui[data-theme=light] .table .you{color:#0a8a55}.table .big{font-size:15px;font-weight:900;padding-bottom:4px;border-bottom:1px solid var(--line)}
 .count{font:900 96px/1 ui-monospace,monospace;color:var(--ink);text-shadow:0 0 30px var(--k-sys);animation:bui-slam .5s both}
@@ -338,7 +350,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   // The match's running numbers, stored in place (a double in a closure variable is a new heap number per write).
   const G = new Float64Array(24);
   const CNT = 0, MATCH = 1, TILE_IN = 2, CRATE_IN = 3, QUAKE = 4, WAVE = 5, PHASE = 6, PH_T = 7, SCORE = 8, DROPS = 9, POWER = 10, CHAIN = 11;
-  const BUGS_LEFT = 12, BUG_IN = 13, FLIES_LEFT = 14, FLY_IN = 15, RES = 16, KILLS = 17, WAVE_T = 18, OUT_T = 19;
+  const BUGS_LEFT = 12, BUG_IN = 13, FLIES_LEFT = 14, FLY_IN = 15, RES = 16, KILLS = 17, WAVE_T = 18, OUT_T = 19, PLAYED = 20, DTS = 21;
   // Phases of a wave: its card (no spawns), the fight, cleared (a beat, then the next card).
   const P_CARD = 0, P_FIGHT = 1, P_CLEAR = 2;
   const RESUME = 3, WAVES = o.waves ?? 5;
@@ -358,11 +370,11 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
   })();
   let ride: number = (o.ride ?? (saved === "tank" ? "tank" : "plane")) === "tank" ? TANK : PLANE;
-  const mkUnit = (i: number): Unit => ({
+  const mkUnit = (i: number): Unit => dbl({
     i, kind: 0, name: "", color: "", you: false, x: 0, y: 0, a: -Math.PI / 2, ta: -Math.PI / 2, vx: 0, vy: 0, hp: 0, alive: false, dead: 0.4 + i * 0.5, drop: 0,
     shield: 0, rapid: 0, triple: 0, strikes: 1, carpet: 0, rail: 3, charge: 0, chargeT: -1, heat: 0, hot: 0, cool: 0, kills: 0, deaths: 0,
     recoil: 0, flash: 0, tread: 0, run: 0, gx: 0, gy: 0, think: 0, target: -1, xp: 0, tier: 1, bite: 0,
-  });
+  }, "x y a ta vx vy hp dead drop shield rapid triple charge heat hot cool recoil flash tread gx gy think xp bite");
   /** You (crew[0]) and your partner (crew[1]). The seam for a second human: pilot() below. */
   const crew: Unit[] = [mkUnit(0), mkUnit(1)];
   const you = crew[0]!, mate = crew[1]!;
@@ -373,15 +385,15 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   }
   cast();
   const MAXF = 80;
-  const foes: Foe[] = Array.from({ length: MAXF }, () => ({ on: false, kind: 0, sub: 0, x: 0, y: 0, a: 0, ta: 0, vx: 0, vy: 0, hp: 0, max: 1, t: 0, think: 0, gx: 0, gy: 0, flash: 0, eaten: 0, tier: 1, home: -1, mode: 0, cool: 0, tread: 0, recoil: 0, food: -1, pipe: -1, u: 0, dir: 1 }));
+  const foes: Foe[] = Array.from({ length: MAXF }, () => dbl({ on: false, kind: 0, sub: 0, x: 0, y: 0, a: 0, ta: 0, vx: 0, vy: 0, hp: 0, max: 1, t: 0, think: 0, gx: 0, gy: 0, flash: 0, eaten: 0, tier: 1, home: -1, mode: 0, cool: 0, tread: 0, recoil: 0, food: -1, pipe: -1, u: 0, dir: 1 }, "x y a ta vx vy hp max t think gx gy flash cool tread recoil u"));
   const SITES = 6;
-  const sites: Site[] = Array.from({ length: SITES }, () => ({ on: false, kind: 0, x: 0, y: 0, w: 0, h: 0, hp: 0, max: 1, t: 0, label: 0, won: false, flash: 0, cool: 0, out: 0 }));
-  const shells: Shell[] = Array.from({ length: 200 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1, foe: false, kind: 0 }));
-  const tiles: Tile[] = Array.from({ length: 22 }, () => ({ c: 0, r: 0, type: 0, roll: 0, t: 0, on: false }));
-  const marks: Mark[] = Array.from({ length: 8 }, () => ({ x: 0, y: 0, t: 0, max: 1, owner: 0, on: false }));
-  const bombers: Bomber[] = Array.from({ length: 6 }, () => ({ x: 0, y: 0, vx: 0, vy: 0, a: 0, t: 0, owner: 0, on: false }));
-  const bombs: Bomb[] = Array.from({ length: 40 }, () => ({ x: 0, y: 0, wait: 0, fall: 0, owner: 0, main: false, on: false }));
-  const booms: Boom[] = Array.from({ length: 48 }, () => ({ x: 0, y: 0, t: 0, p: 0, c: 0, on: false }));
+  const sites: Site[] = Array.from({ length: SITES }, () => dbl({ on: false, kind: 0, x: 0, y: 0, w: 0, h: 0, hp: 0, max: 1, t: 0, label: 0, won: false, flash: 0, cool: 0, out: 0 }, "x y w h hp max t flash cool"));
+  const shells: Shell[] = Array.from({ length: 200 }, () => dbl({ x: 0, y: 0, vx: 0, vy: 0, life: 0, owner: 0, on: false, rail: false, tgt: -1, foe: false, kind: 0 }, "x y vx vy life"));
+  const tiles: Tile[] = Array.from({ length: 22 }, () => dbl({ c: 0, r: 0, type: 0, roll: 0, t: 0, on: false }, "roll t"));
+  const marks: Mark[] = Array.from({ length: 8 }, () => dbl({ x: 0, y: 0, t: 0, max: 1, owner: 0, on: false }, "x y t max"));
+  const bombers: Bomber[] = Array.from({ length: 6 }, () => dbl({ x: 0, y: 0, vx: 0, vy: 0, a: 0, t: 0, owner: 0, on: false }, "x y vx vy a t"));
+  const bombs: Bomb[] = Array.from({ length: 40 }, () => dbl({ x: 0, y: 0, wait: 0, fall: 0, owner: 0, main: false, on: false }, "x y wait fall"));
+  const booms: Boom[] = Array.from({ length: 48 }, () => dbl({ x: 0, y: 0, t: 0, p: 0, c: 0, on: false }, "x y t p"));
   // Base walls: 4 per base, kept at the end of `blocks` (cover first), live while the wave lasts.
   const blocks: Block[] = [];
   let coverN = 0;
@@ -420,7 +432,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     rows = Math.floor(H / T);
     area = Math.max(0.5, Math.min(1.3, (W * H) / (1100 * 640)));
     if (!embed) layBlocks();
-    else if (!blocks.length) for (let k = 0; k < 8; k++) blocks.push({ x: 0, y: 0, w: 0, h: 0, hp: 0, back: 0, site: -2 });
+    else if (!blocks.length) for (let k = 0; k < 8; k++) blocks.push(dbl({ x: 0, y: 0, w: 0, h: 0, hp: 0, back: 0, site: -2 }, "x y w h hp back"));
     coverDirty = true;
   }
   /** Cover blocks (Blitz's), the 8 wall slots after them, and the board's copy. */
@@ -429,10 +441,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     const n = Math.round((cols * rows) / 40);
     for (let k = 0; k < n; k++) {
       const c = 1 + Math.floor(R() * (cols - 2)), r = 3 + Math.floor(R() * (rows - 5)), long = R() < 0.4;
-      blocks.push({ x: c * T + 3, y: r * T + 3, w: (long ? 2 : 1) * T - 6, h: T - 6, hp: 3, back: 0, site: -1 });
+      blocks.push(dbl({ x: c * T + 3, y: r * T + 3, w: (long ? 2 : 1) * T - 6, h: T - 6, hp: 3, back: 0, site: -1 }, "x y w h hp back"));
     }
     coverN = blocks.length;
-    for (let k = 0; k < 8; k++) blocks.push({ x: 0, y: 0, w: 0, h: 0, hp: 0, back: 0, site: -2 });
+    for (let k = 0; k < 8; k++) blocks.push(dbl({ x: 0, y: 0, w: 0, h: 0, hp: 0, back: 0, site: -2 }, "x y w h hp back"));
     // The copy: lines of the four games' taglines, set like a page in the open rows.
     glyphs = 0;
     const cw = Math.round(T * 0.27), lines = Math.max(3, Math.min(7, Math.floor(rows / 2.2)));
@@ -452,8 +464,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
   }
   // The step's number registers (Blitz, K4): a double passed to a call V8 doesn't inline is boxed.
-  const F = new Float64Array(24);
-  const BX = 0, BY = 1, BR = 2, TF = 3, TT = 4, TM = 5, TO = 6, DX = 7, DY = 8, DT = 9, SX = 10, SY = 11, SR = 12, HX = 13, HY = 14, HO = 15, KX = 16, KY = 17, QX = 18, QY = 19, LAST = 20, AX = 21, AY = 22;
+  const F = new Float64Array(32);
+  const BX = 0, BY = 1, BR = 2, TF = 3, TT = 4, TM = 5, TO = 6, DX = 7, DY = 8, DT = 9, SX = 10, SY = 11, SR = 12, HX = 13, HY = 14, HO = 15, KX = 16, KY = 17, QX = 18, QY = 19, LAST = 20, AX = 21, AY = 22, WT = 23, SPD = 24, GRIP = 25, SA = 26, SS = 27, SL = 28, PU = 29;
   function hyp() {
     F[HO] = dist(F[HX]!, F[HY]!);
   }
@@ -512,7 +524,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function knockAround(x: number, y: number, rad: number, power: number) {
     if (!embed) return;
     for (const c of covers) {
-      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = dist(cx - x, cy - y);
+      const cx = c.x + c.w / 2, cy = c.y + c.h / 2, d = Math.sqrt((cx - x) * (cx - x) + (cy - y) * (cy - y));
       if (d < rad) knock(c, (cx - x) / (d || 1), (cy - y) / (d || 1), power * (1 - d / rad) + 0.4, false);
     }
   }
@@ -547,7 +559,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     const x = FQ[0]!, y = FQ[1]!, power = FQ[2]!;
     fxPush(FX_BLAST);
     if (demo || !you.alive || state !== "play") return;
-    const reach = 250 * (scale / 1.4), d = dist(x - you.x, y - you.y);
+    const reach = 250 * (scale / 1.4), d = Math.sqrt((x - you.x) * (x - you.x) + (y - you.y) * (y - you.y));
     if (d < reach) G[QUAKE] = Math.min(18, G[QUAKE]! + power * 3.5 * (1 - d / reach) ** 1.5);
   }
   const blast = (x: number, y: number, p: number, c: number) => ((FQ[0] = x), (FQ[1] = y), (FQ[2] = p), (FQ[3] = c), boomQ());
@@ -579,18 +591,11 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const air = (k: number) => k >= 0 && k < MAXF && (foes[k]!.kind === ALIEN || foes[k]!.kind === FLY);
   /** How much u's ride cares about target k (lower = sooner): the plane goes for the air and the
    *  factories, the tank for walls, cores and armour. Auto-aim (you) treats everything the same. */
-  function weight(u: Unit, k: number) {
-    if (!u.you && u.kind === PLANE) {
-      if (k >= MAXF) return sites[k - MAXF]!.kind === FACTORY ? 0.55 : 2.4;
-      const kd = foes[k]!.kind;
-      return kd === ALIEN || kd === FLY ? 0.6 : kd === ETANK ? 1.8 : 0.9;
-    }
-    if (!u.you) {
-      if (k >= MAXF) return sites[k - MAXF]!.kind === BASE ? 0.5 : 1.3;
-      const kd = foes[k]!.kind;
-      return kd === ETANK ? 0.55 : kd === BUG ? (foes[k]!.tier >= 3 ? 0.6 : 0.85) : 1.3;
-    }
-    return 1;
+  function weightF(u: Unit, k: number) {
+    const kd = k >= MAXF ? 4 + sites[k - MAXF]!.kind : foes[k]!.kind;
+    if (u.you) F[WT] = 1;
+    else if (u.kind === PLANE) F[WT] = kd === 4 + FACTORY ? 0.55 : kd === 4 + BASE ? 2.4 : kd === ALIEN || kd === FLY ? 0.6 : kd === ETANK ? 1.8 : 0.9;
+    else F[WT] = kd === 4 + BASE ? 0.5 : kd === 4 + FACTORY ? 1.3 : kd === ETANK ? 0.55 : kd === BUG ? (foes[k]!.tier >= 3 ? 0.6 : 0.85) : 1.3;
   }
   /** The best target for u within range of (x, y): by distance × weight. -1 when none. */
   function pick(u: Unit, x: number, y: number, range: number) {
@@ -602,7 +607,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       F[HX] = f.x - x;
       F[HY] = f.y - y;
       hyp();
-      const d = F[HO]! * weight(u, i);
+      weightF(u, i);
+      const d = F[HO]! * F[WT]!;
       if (d < bd) (bd = d), (best = i);
     }
     for (let i = 0; i < SITES; i++) {
@@ -611,7 +617,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       F[HX] = s.x - x;
       F[HY] = s.y - y;
       hyp();
-      const d = F[HO]! * weight(u, MAXF + i);
+      weightF(u, MAXF + i);
+      const d = F[HO]! * F[WT]!;
       if (d < bd) (bd = d), (best = MAXF + i);
     }
     return best;
@@ -623,8 +630,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     return null;
   }
   /** A shell from (F[SX], F[SY]) at angle `a`, speed `sp`, `life` s. */
-  function shoot(owner: number, foe: boolean, kind: number, a: number, sp: number, life: number) {
-    const s = freeShell();
+  /** A shell from (F[SX], F[SY]) at angle F[SA], speed F[SS], living F[SL] s. */
+  function shoot(owner: number, foe: boolean, kind: number) {
+    const s = freeShell(), a = F[SA]!, sp = F[SS]!, life = F[SL]!;
     if (!s) return null;
     s.on = true;
     s.rail = kind === K_RAIL;
@@ -646,7 +654,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         const a = u.ta + (spreads > 1 ? (k - 1) * 0.2 : 0) + (R() - 0.5) * (u.you ? 0.04 : 0.08);
         F[SX] = u.x + Math.cos(a) * len;
         F[SY] = u.y + Math.sin(a) * len;
-        shoot(u.i, false, K_SHELL, a, 600, 1);
+        ((F[SA] = a), (F[SS] = 600), (F[SL] = 1), shoot(u.i, false, K_SHELL));
       }
       u.recoil = 6;
       u.flash = 0.08;
@@ -663,7 +671,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       const off = (k - (n - 1) / 2) * 7, fan = u.tier >= 3 ? (k - (n - 1) / 2) * 0.06 : 0;
       F[SX] = u.x + ca * 18 - sa * off;
       F[SY] = u.y + sa * 18 + ca * off;
-      shoot(u.i, false, K_BOLT, u.ta + fan + (R() - 0.5) * 0.03, 780, 0.72);
+      ((F[SA] = u.ta + fan + (R() - 0.5) * 0.03), (F[SS] = 780), (F[SL] = 0.72), shoot(u.i, false, K_BOLT));
     }
     u.cool = (u.rapid > 0 ? 0.07 : TIER_COOL[u.tier]!) * (u.you ? 1 : 1.7);
     u.flash = 0.05;
@@ -686,7 +694,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (u.kind === TANK) {
       F[SX] = u.x + Math.cos(a) * 26 * scale;
       F[SY] = u.y + Math.sin(a) * 26 * scale;
-      const s = shoot(u.i, false, K_RAIL, a, 1500, 2);
+      const s = ((F[SA] = a), (F[SS] = 1500), (F[SL] = 2), shoot(u.i, false, K_RAIL));
       if (s) s.tgt = u.chargeT;
       u.recoil = 11;
       u.flash = 0.14;
@@ -698,7 +706,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         const side = k % 2 ? 1 : -1;
         F[SX] = u.x - Math.sin(a) * side * 14;
         F[SY] = u.y + Math.cos(a) * side * 14;
-        const s = shoot(u.i, false, K_RAIL, a + side * (0.5 + k * 0.15), 620, 2.2);
+        const s = ((F[SA] = a + side * (0.5 + k * 0.15)), (F[SS] = 620), (F[SL] = 2.2), shoot(u.i, false, K_RAIL));
         if (s) s.tgt = k === 0 ? u.chargeT : pick(u, F[QX]! + (R() - 0.5) * 200, F[QY]! + (R() - 0.5) * 200, 500);
         if (s && s.tgt < 0) s.tgt = u.chargeT;
       }
@@ -951,11 +959,11 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       // A mine hurts everything on the ground nearby: your tank, bugs, enemy tanks.
       for (let i = 0; i < 2; i++) {
         const v = crew[i]!;
-        if (v.kind === TANK && dist(v.x - cx, v.y - cy) < 80 * (scale / 1.4)) damage(v, 2);
+        if (v.kind === TANK && Math.sqrt((v.x - cx) * (v.x - cx) + (v.y - cy) * (v.y - cy)) < 80 * (scale / 1.4)) damage(v, 2);
       }
       for (let i = 0; i < MAXF; i++) {
         const f = foes[i]!;
-        if (f.on && (f.kind === BUG || f.kind === ETANK) && dist(f.x - cx, f.y - cy) < 80 * (scale / 1.4)) hurtFoe(f, 4, -1);
+        if (f.on && (f.kind === BUG || f.kind === ETANK) && Math.sqrt((f.x - cx) * (f.x - cx) + (f.y - cy) * (f.y - cy)) < 80 * (scale / 1.4)) hurtFoe(f, 4, -1);
       }
       e.events.emit("boom", -1);
       return;
@@ -1021,7 +1029,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         const s = sites[i]!;
         if (s.on && Math.abs(s.x - F[AX]!) < (s.w + w) / 2 + 60 && Math.abs(s.y - F[AY]!) < (s.h + h) / 2 + 60) ok = false;
       }
-      for (let i = 0; i < 2 && ok; i++) if (crew[i]!.alive && dist(crew[i]!.x - F[AX]!, crew[i]!.y - F[AY]!) < 220) ok = false;
+      for (let i = 0; i < 2 && ok; i++) if (crew[i]!.alive && Math.sqrt((crew[i]!.x - F[AX]!) * (crew[i]!.x - F[AX]!) + (crew[i]!.y - F[AY]!) * (crew[i]!.y - F[AY]!)) < 220) ok = false;
       if (ok) return;
     }
   }
@@ -1096,8 +1104,9 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     // Pink power squares, a few along the pipes (Byte Runner: they turn the flies blue).
     for (let k = 0; k < Math.min(6, 2 + n) && pellets > 8; k++) pelPow[4 + Math.floor(R() * (pellets - 8))] = 1;
   }
-  /** A point d px along pipe p, into F[QX], F[QY]. */
-  function onPipe(p: number, d: number) {
+  /** A point F[PU] px along pipe p, into F[QX], F[QY]. */
+  function onPipe(p: number) {
+    let d = F[PU]!;
     const k = p * 4;
     for (let j = 0; j < 3; j++) {
       const sx = pipeX[k + j]!, sy = pipeY[k + j]!, ex = pipeX[k + j + 1]!, ey = pipeY[k + j + 1]!, l = Math.abs(ex - sx) + Math.abs(ey - sy);
@@ -1115,7 +1124,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     G[PH_T] = demo ? 1.2 : 2.8;
     G[WAVE_T] = 0;
     G[POWER] = 0;
-    for (const s of sites) s.on = false;
+    for (let is1 = 0; is1 < sites.length; is1++) { const s = sites[is1]!; s.on = false; }
     for (let i = coverN; i < blocks.length; i++) (blocks[i]!.hp = 0), (blocks[i]!.site = -2);
     pipes = pellets = 0;
     // The letters come back each wave (the page heals between cartridges).
@@ -1175,7 +1184,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function flyIn() {
     if (!pipes) return;
     const p = (R() * pipes) | 0, end = R() < 0.5;
-    onPipe(p, end ? pipeLen[p]! : 0);
+    (F[PU] = end ? pipeLen[p]! : 0), onPipe(p);
     const i = addFoe(FLY, F[QX]!, F[QY]!, (G[FLIES_LEFT]! | 0) % 3, -1);
     if (i < 0) return;
     const f = foes[i]!;
@@ -1198,15 +1207,13 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     F[TO] = from + Math.sign(d) * Math.min(Math.abs(d), max);
   }
   /** Drive a tank (yours, or an enemy's when `foe`) by the stick (F[DX], F[DY]) for F[DT] s at `speed`. */
-  function driveF(x: number, y: number, a: number, speed: number, out: Float64Array) {
-    const ax = F[DX]!, ay = F[DY]!, dt = F[DT]!;
+  function driveF(out: Float64Array) {
+    const ax = F[DX]!, ay = F[DY]!, dt = F[DT]!, x = out[0]!, y = out[1]!, speed = F[SPD]!;
+    let a = out[2]!;
     F[HX] = ax;
     F[HY] = ay;
     hyp();
     const m = Math.min(1, F[HO]!);
-    out[0] = x;
-    out[1] = y;
-    out[2] = a;
     out[3] = 0;
     if (m < 0.05) return;
     F[TF] = a;
@@ -1228,7 +1235,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   const dv = new Float64Array(4);
   function drive(u: Unit) {
     if (u.kind === PLANE) return fly(u);
-    driveF(u.x, u.y, u.a, 150, dv);
+    (dv[0] = u.x), (dv[1] = u.y), (dv[2] = u.a), (F[SPD] = 150), driveF(dv);
     u.x = dv[0]!;
     u.y = dv[1]!;
     u.a = dv[2]!;
@@ -1244,7 +1251,12 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     u.tread += dt * 8;
     if (ax * ax + ay * ay > 0.01) (F[TF] = u.a), (F[TT] = Math.atan2(ay, ax)), (F[TM] = 6 * dt), turnF(), (u.a = F[TO]!);
   }
-  const turretTo = (u: { ta: number }, to: number, max: number) => ((F[TF] = u.ta), (F[TT] = to), (F[TM] = max), turnF(), (u.ta = F[TO]!));
+  /** Turn a turret (u.ta) toward F[TT] by at most F[TM]. */
+  function turretF(u: { ta: number }) {
+    F[TF] = u.ta;
+    turnF();
+    u.ta = F[TO]!;
+  }
 
   // ---------- Your controls, and the seam ----------
   /** What your guns are on: the lock, else auto-aim's pick, else nothing (-1). */
@@ -1255,13 +1267,14 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     return autoOn ? pick(you, you.x, you.y, 520) : -1;
   }
-  function player(dt: number) {
+  function player() {
+    const dt = G[DTS]!;
     const u = you;
     (F[DX] = input.axis("left", "right", 0)), (F[DY] = input.axis("up", "down", 1)), (F[DT] = dt), drive(u);
     const touch = input.stick.active || coarse.matches, aim = aimTarget();
-    if (aim >= 0 && where(aim)) turretTo(u, Math.atan2(F[QY]! - u.y, F[QX]! - u.x), (u.kind === PLANE ? 12 : 8) * dt);
-    else if (!touch || input.pointer.down) turretTo(u, Math.atan2(input.pointer.y - u.y, input.pointer.x - u.x), (u.kind === PLANE ? 14 : 10) * dt);
-    else turretTo(u, u.a, 4 * dt);
+    if (aim >= 0 && where(aim)) (F[TT] = Math.atan2(F[QY]! - u.y, F[QX]! - u.x)), (F[TM] = (u.kind === PLANE ? 12 : 8) * dt), turretF(u);
+    else if (!touch || input.pointer.down) (F[TT] = Math.atan2(input.pointer.y - u.y, input.pointer.x - u.x)), (F[TM] = (u.kind === PLANE ? 14 : 10) * dt), turretF(u);
+    else (F[TT] = u.a), (F[TM] = 4 * dt), turretF(u);
     if ((input.down("fire") || input.pointer.down || fireQ) && !targeting && u.cool <= 0 && u.hot <= 0 && u.charge <= 0) fire(u);
     if (u.cool <= 0) fireQ = false;
     if (longQ) {
@@ -1276,7 +1289,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (u.strikes <= 0) targeting = false;
   }
   /** The partner (and both rides in the attract match): Blitz's bot brain, given a ride's job. */
-  function ai(u: Unit, dt: number) {
+  function ai(u: Unit) {
+    const dt = G[DTS]!;
     const other = crew[1 - u.i]!;
     u.think -= dt;
     if (u.think <= 0) {
@@ -1287,15 +1301,15 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       let gxx = -1, gyy = 0;
       // Hurt: a heal tile or a crate first. Byte Runner: the tank goes for a power square when flies are near.
       if (u.hp <= MAXHP[u.kind]! / 2)
-        for (const s of tiles) if (s.on && s.roll <= 0 && (s.type === HEAL || s.type === SHIELD) && dist((s.c + 0.5) * T - u.x, (s.r + 0.5) * T - u.y) < 360) (gxx = (s.c + 0.5) * T), (gyy = (s.r + 0.5) * T);
-      for (let i = 0; i < supply.count && gxx < 0; i++) if (supply.landed(i) && dist(supply.x[i]! - u.x, supply.y[i]! - u.y) < 420) (gxx = supply.x[i]!), (gyy = supply.y[i]!);
+        for (let is2 = 0; is2 < tiles.length; is2++) { const s = tiles[is2]!; if (s.on && s.roll <= 0 && (s.type === HEAL || s.type === SHIELD) && Math.sqrt(((s.c + 0.5) * T - u.x) * ((s.c + 0.5) * T - u.x) + ((s.r + 0.5) * T - u.y) * ((s.r + 0.5) * T - u.y)) < 360) (gxx = (s.c + 0.5) * T), (gyy = (s.r + 0.5) * T); }
+      for (let i = 0; i < supply.count && gxx < 0; i++) if (supply.landed(i) && Math.sqrt((supply.x[i]! - u.x) * (supply.x[i]! - u.x) + (supply.y[i]! - u.y) * (supply.y[i]! - u.y)) < 420) (gxx = supply.x[i]!), (gyy = supply.y[i]!);
       if (gxx < 0 && pipes && G[POWER]! <= 0 && u.kind === TANK)
-        for (let p = 0; p < pellets; p++) if (pelOn[p] && pelPow[p] && dist(pelX[p]! - u.x, pelY[p]! - u.y) < 380) (gxx = pelX[p]!), (gyy = pelY[p]!), (p = pellets);
+        for (let p = 0; p < pellets; p++) if (pelOn[p] && pelPow[p] && Math.sqrt((pelX[p]! - u.x) * (pelX[p]! - u.x) + (pelY[p]! - u.y) * (pelY[p]! - u.y)) < 380) (gxx = pelX[p]!), (gyy = pelY[p]!), (p = pellets);
       // Power on: chase the nearest blue fly to eat it.
       if (gxx < 0 && G[POWER]! > 0.6)
         for (let i = 0, bd = 520; i < MAXF; i++) {
           const f = foes[i]!;
-          if (f.on && f.kind === FLY && dist(f.x - u.x, f.y - u.y) < bd) (bd = dist(f.x - u.x, f.y - u.y)), (gxx = f.x), (gyy = f.y);
+          if (f.on && f.kind === FLY && Math.sqrt((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y)) < bd) (bd = Math.sqrt((f.x - u.x) * (f.x - u.x) + (f.y - u.y) * (f.y - u.y))), (gxx = f.x), (gyy = f.y);
         }
       if (gxx >= 0) (u.gx = gxx), (u.gy = gyy);
       else if (where(u.target)) {
@@ -1321,40 +1335,42 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     } else if (u.kind === PLANE) (F[DX] = 0), (F[DY] = 0), (F[DT] = dt), fly(u);
     if (where(u.target)) {
       const aim = Math.atan2(F[QY]! - u.y, F[QX]! - u.x);
-      turretTo(u, aim, (u.kind === PLANE ? 7 : 4.5) * dt);
+      (F[TT] = aim), (F[TM] = (u.kind === PLANE ? 7 : 4.5) * dt), turretF(u);
       const err = Math.abs(Math.atan2(Math.sin(aim - u.ta), Math.cos(aim - u.ta)));
       F[HX] = F[QX]! - u.x;
       F[HY] = F[QY]! - u.y;
       hyp();
       if (u.cool <= 0 && u.charge <= 0 && err < 0.14 && F[HO]! < (u.kind === PLANE ? 520 : 470)) fire(u);
-    } else turretTo(u, u.a, 3 * dt);
+    } else (F[TT] = u.a), (F[TM] = 3 * dt), turretF(u);
   }
   /**
    * The seam: the one place a ride's controls come from. You (this screen's input) or the AI.
    * A second human later (presence, lockstep like Blitz's net play) plugs in here: decode their
    * input word for crew[1] instead of calling ai(). Nothing else in the match knows who drives.
    */
-  function pilot(u: Unit, dt: number) {
-    if (u.you) player(dt);
-    else ai(u, dt);
+  function pilot(u: Unit) {
+    if (u.you) player();
+    else ai(u);
   }
 
   // ---------- Foes ----------
   /** The nearest live ride to (x, y) (ground only when `ground`), into F[QX], F[QY]; its index or -1. */
-  function nearestRide(x: number, y: number, ground: boolean) {
+  function nearestRide(o: { x: number; y: number }, ground: boolean) {
+    const x = o.x, y = o.y;
     let best = -1, bd = 1e9;
     for (let i = 0; i < 2; i++) {
       const u = crew[i]!;
       if (!u.alive || u.drop < 1 || (ground && u.kind === PLANE)) continue;
-      const d = dist(u.x - x, u.y - y);
+      const d = Math.sqrt((u.x - x) * (u.x - x) + (u.y - y) * (u.y - y));
       if (d < bd) (bd = d), (best = i);
     }
     if (best >= 0) (F[QX] = crew[best]!.x), (F[QY] = crew[best]!.y);
     return best;
   }
   /** Steer foe f toward (F[QX], F[QY]) at `sp` px/s with `grip` (how fast it turns its velocity). */
-  function steerTo(f: Foe, sp: number, grip: number, dt: number) {
-    const dx = F[QX]! - f.x, dy = F[QY]! - f.y, d = dist(dx, dy) || 1;
+  /** Steer foe f toward (F[QX], F[QY]) at F[SPD] px/s with grip F[GRIP] (how fast it turns its velocity). */
+  function steerF(f: Foe) {
+    const sp = F[SPD]!, grip = F[GRIP]!, dt = G[DTS]!, dx = F[QX]! - f.x, dy = F[QY]! - f.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
     f.vx += ((dx / d) * sp - f.vx) * Math.min(1, grip * dt);
     f.vy += ((dy / d) * sp - f.vy) * Math.min(1, grip * dt);
     f.x += f.vx * dt;
@@ -1362,7 +1378,8 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (f.vx * f.vx + f.vy * f.vy > 4) f.a = Math.atan2(f.vy, f.vx);
   }
   /** Swarm Protocol's bug: find a letter, chew it into binary, grow at 6 and 12; a hunter goes for you. */
-  function bugStep(f: Foe, idx: number, dt: number) {
+  function bugStep(f: Foe, idx: number) {
+    const dt = G[DTS]!;
     f.t += dt;
     const sp = (70 + f.tier * 18 + Math.min(40, G[WAVE]! * 3)) * (scale / 1.4);
     if (f.tier < 3 && glyphs) {
@@ -1381,7 +1398,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (f.food >= 0) {
         F[QX] = gx[f.food]!;
         F[QY] = gy[f.food]! - 4;
-        if (dist(F[QX]! - f.x, F[QY]! - f.y) < 8) {
+        if (Math.sqrt((F[QX]! - f.x) * (F[QX]! - f.x) + (F[QY]! - f.y) * (F[QY]! - f.y)) < 8) {
           // Chew (Swarm: 0.24 s a letter), then the letter turns into a 0 or a 1.
           f.vx = f.vy = 0;
           if ((f.cool -= dt) <= 0) {
@@ -1401,18 +1418,19 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
           return;
         }
         f.cool = 0.24;
-        return steerTo(f, sp, 6, dt);
+        return void (F[SPD] = sp), (F[GRIP] = 6), steerF(f);
       }
     }
     // A hunter (or a bug with nothing left to eat): straight at the nearest ride.
-    if (nearestRide(f.x, f.y, false) < 0) return;
-    steerTo(f, sp * (f.tier >= 3 ? 1.15 : 1), 4, dt);
+    if (nearestRide(f, false) < 0) return;
+    (F[SPD] = sp * (f.tier >= 3 ? 1.15 : 1)), (F[GRIP] = 4), steerF(f);
   }
   /** Null Invaders' alien: holds a slot near its factory, swoops at you, drops bolts. */
-  function alienStep(f: Foe, dt: number) {
+  function alienStep(f: Foe) {
+    const dt = G[DTS]!;
     f.t += dt;
     f.think -= dt;
-    const target = nearestRide(f.x, f.y, false);
+    const target = nearestRide(f, false);
     if (f.think <= 0) {
       f.think = 1.4 + R() * 1.6;
       f.mode = target >= 0 && R() < 0.55 ? 1 : 0;
@@ -1428,24 +1446,25 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     F[QX] = f.gx + Math.sin(f.t * 2 + f.sub) * 26;
     F[QY] = f.gy;
-    steerTo(f, (110 - f.sub * 18) * (scale / 1.4), 2.4, dt);
+    (F[SPD] = (110 - f.sub * 18) * (scale / 1.4)), (F[GRIP] = 2.4), steerF(f);
     f.a = Math.PI / 2;
     if ((f.cool -= dt) <= 0 && target >= 0) {
       f.cool = 1.8 + R() * 1.6 - Math.min(0.8, G[WAVE]! * 0.06);
       const u = crew[target]!;
-      if (dist(u.x - f.x, u.y - f.y) < 420) {
+      if (Math.sqrt((u.x - f.x) * (u.x - f.x) + (u.y - f.y) * (u.y - f.y)) < 420) {
         F[SX] = f.x;
         F[SY] = f.y + 10;
-        shoot(-1, true, K_ALIEN, Math.atan2(u.y - f.y, u.x - f.x) + (R() - 0.5) * 0.2, 250, 2.2);
+        ((F[SA] = Math.atan2(u.y - f.y, u.x - f.x) + (R() - 0.5) * 0.2), (F[SS] = 250), (F[SL] = 2.2), shoot(-1, true, K_ALIEN));
       }
     }
   }
   /** Sherman Bytes' enemy tank: drives at your tank (or the plane's shadow), turret on you, fires. */
-  function etankStep(f: Foe, dt: number) {
+  function etankStep(f: Foe) {
+    const dt = G[DTS]!;
     f.think -= dt;
     f.cool -= dt;
     f.recoil = Math.max(0, f.recoil - dt * 30);
-    const target = nearestRide(f.x, f.y, true) >= 0 ? 1 : nearestRide(f.x, f.y, false) >= 0 ? 2 : 0;
+    const target = nearestRide(f, true) >= 0 ? 1 : nearestRide(f, false) >= 0 ? 2 : 0;
     if (!target) return;
     const tx = F[QX]!, ty = F[QY]!;
     if (f.think <= 0) {
@@ -1454,10 +1473,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       f.gx = Math.max(30, Math.min(W - 30, tx + Math.cos(a) * keep));
       f.gy = Math.max(70, Math.min(H - 30, ty + Math.sin(a) * keep));
     }
-    const dx = f.gx - f.x, dy = f.gy - f.y, d = dist(dx, dy);
+    const dx = f.gx - f.x, dy = f.gy - f.y, d = Math.sqrt(dx * dx + dy * dy);
     if (d > 16) {
       (F[DX] = dx / d), (F[DY] = dy / d), (F[DT] = dt);
-      driveF(f.x, f.y, f.a, 92 + Math.min(40, G[WAVE]! * 4), dv);
+      (dv[0] = f.x), (dv[1] = f.y), (dv[2] = f.a), (F[SPD] = 92 + Math.min(40, G[WAVE]! * 4)), driveF(dv);
       if (Math.abs(dv[0]! - f.x) + Math.abs(dv[1]! - f.y) < 0.01) f.think = Math.min(f.think, 0.1);
       f.x = dv[0]!;
       f.y = dv[1]!;
@@ -1465,28 +1484,29 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       f.tread += dv[3]! * 0.15;
     }
     const aim = Math.atan2(ty - f.y, tx - f.x);
-    turretTo(f, aim, 2.6 * dt);
+    (F[TT] = aim), (F[TM] = 2.6 * dt), turretF(f);
     const err = Math.abs(Math.atan2(Math.sin(aim - f.ta), Math.cos(aim - f.ta)));
     // Enemy shells are ground fire: they only hit your tank (the plane is out of their reach).
-    if (target === 1 && f.cool <= 0 && err < 0.12 && dist(tx - f.x, ty - f.y) < 430) {
+    if (target === 1 && f.cool <= 0 && err < 0.12 && Math.sqrt((tx - f.x) * (tx - f.x) + (ty - f.y) * (ty - f.y)) < 430) {
       f.cool = 1.5 + R() * 1.1;
       F[SX] = f.x + Math.cos(f.ta) * 30;
       F[SY] = f.y + Math.sin(f.ta) * 30;
-      shoot(-1, true, K_ETANK, f.ta + (R() - 0.5) * 0.08, 430, 1.2);
+      ((F[SA] = f.ta + (R() - 0.5) * 0.08), (F[SS] = 430), (F[SL] = 1.2), shoot(-1, true, K_ETANK));
       f.recoil = 6;
       puff(1, F[SX]!, F[SY]!, 8, 0.12, 2);
       e.events.emit("shot", -1);
     }
   }
   /** Byte Runner's fly: races its pipe, hops off to chase (violet straight, pink ahead of you, cyan roams). */
-  function flyStep(f: Foe, dt: number) {
+  function flyStep(f: Foe) {
+    const dt = G[DTS]!;
     f.t += dt;
     const blue = G[POWER]! > 0, sp = (blue ? 110 : 150 + Math.min(60, G[WAVE]! * 5)) * (scale / 1.4);
     if (f.pipe >= 0) {
       f.u += f.dir * 240 * (scale / 1.4) * dt;
       if (f.u <= 0 || f.u >= pipeLen[f.pipe]!) (f.dir = -f.dir), (f.u = Math.max(0, Math.min(pipeLen[f.pipe]!, f.u)));
       const px = f.x, py = f.y;
-      onPipe(f.pipe, f.u);
+      (F[PU] = f.u), onPipe(f.pipe);
       f.x = F[QX]!;
       f.y = F[QY]!;
       f.vx = (f.x - px) / dt;
@@ -1494,23 +1514,24 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       // Off the pipe when a ride is near (blue flies stay on their pipes, running).
       if (!blue && (f.think -= dt) <= 0) {
         f.think = 0.5;
-        const k = nearestRide(f.x, f.y, false);
-        if (k >= 0 && dist(F[QX]! - f.x, F[QY]! - f.y) < 300 && R() < 0.5) (f.pipe = -1), (f.t = 0);
+        const k = nearestRide(f, false);
+        if (k >= 0 && Math.sqrt((F[QX]! - f.x) * (F[QX]! - f.x) + (F[QY]! - f.y) * (F[QY]! - f.y)) < 300 && R() < 0.5) (f.pipe = -1), (f.t = 0);
       }
       return;
     }
-    const k = nearestRide(f.x, f.y, false);
+    const k = nearestRide(f, false);
     if (k < 0) return;
     const u = crew[k]!;
     if (blue) (F[QX] = f.x * 2 - u.x), (F[QY] = f.y * 2 - u.y);
     else if (f.sub === 1) (F[QX] = u.x + Math.cos(u.a) * 90), (F[QY] = u.y + Math.sin(u.a) * 90);
     else if (f.sub === 2) (F[QX] = u.x + Math.cos(f.t * 1.7) * 110), (F[QY] = u.y + Math.sin(f.t * 1.3) * 110);
-    steerTo(f, sp, 3.2, dt);
+    (F[SPD] = sp), (F[GRIP] = 3.2), steerF(f);
     f.x = Math.max(16, Math.min(W - 16, f.x));
     f.y = Math.max(56, Math.min(H - 16, f.y));
   }
   /** Sites: factories release aliens (up to 5 each at a time); bases sortie tanks and shoot back. */
-  function siteStep(s: Site, idx: number, dt: number) {
+  function siteStep(s: Site, idx: number) {
+    const dt = G[DTS]!;
     s.flash = Math.max(0, s.flash - dt);
     if (s.hp <= 0) {
       // A taken base repairs your rides parked in it (Sherman Bytes: friendly bases repair).
@@ -1540,19 +1561,19 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     // A base's core has a gun: shells at your tank, flak at the plane.
     if (s.kind === BASE && (s.cool -= dt) <= 0) {
       s.cool = 1.6;
-      const k = nearestRide(s.x, s.y, false);
-      if (k >= 0 && dist(F[QX]! - s.x, F[QY]! - s.y) < 340) {
+      const k = nearestRide(s, false);
+      if (k >= 0 && Math.sqrt((F[QX]! - s.x) * (F[QX]! - s.x) + (F[QY]! - s.y) * (F[QY]! - s.y)) < 340) {
         const u = crew[k]!;
         F[SX] = s.x;
         F[SY] = s.y;
-        shoot(-1, true, u.kind === PLANE ? K_FLAK : K_ETANK, Math.atan2(u.y - s.y, u.x - s.x), u.kind === PLANE ? 330 : 420, 1.1);
+        ((F[SA] = Math.atan2(u.y - s.y, u.x - s.x)), (F[SS] = u.kind === PLANE ? 330 : 420), (F[SL] = 1.1), shoot(-1, true, u.kind === PLANE ? K_FLAK : K_ETANK));
       }
     }
   }
 
-  /** Shell s, going to (F[SX], F[SY]) this step, touches the circle (cx, cy, F[SR]): swept, inline. */
-  function sweep(s: Shell, cx: number, cy: number) {
-    const x0 = s.x, y0 = s.y, r = F[SR]!;
+  /** Shell s, going to (F[SX], F[SY]) this step, touches the circle (F[QX], F[QY], F[SR]): swept, inline. */
+  function sweep(s: Shell) {
+    const x0 = s.x, y0 = s.y, cx = F[QX]!, cy = F[QY]!, r = F[SR]!;
     const dx = F[SX]! - x0, dy = F[SY]! - y0, ox = x0 - cx, oy = y0 - cy;
     const a = dx * dx + dy * dy, b = 2 * (ox * dx + oy * dy), c = ox * ox + oy * oy - r * r;
     if (c <= 0) return true;
@@ -1566,7 +1587,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
   function rideOn(b: Block) {
     for (let i = 0; i < 2; i++) {
       const u = crew[i]!;
-      if (u.alive && u.kind === TANK && inRect(u.x, u.y, b.x - 20, b.y - 20, b.w + 40, b.h + 40)) return true;
+      if (u.alive && u.kind === TANK && u.x > b.x - 20 && u.x < b.x + b.w + 20 && u.y > b.y - 20 && u.y < b.y + b.h + 20) return true;
     }
     return false;
   }
@@ -1608,19 +1629,20 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
 
   /** One fixed step of the match. */
   function world(dt: number) {
+    G[DTS] = dt; // the step's length, for the helpers (a number passed to a call is boxed)
     G[MATCH]! += dt;
     fx.step(dt);
     G[QUAKE] = Math.max(0, G[QUAKE]! - dt * 40);
     if (state === "intro" || state === "count") {
       // The start screen: the grid lights up with everything that can land on it.
       if ((G[TILE_IN]! -= dt) <= 0) (lightTile(true), (G[TILE_IN] = 0.08 + R() * 0.16));
-      for (const s of tiles) {
+      for (let is3 = 0; is3 < tiles.length; is3++) { const s = tiles[is3]!;
         if (!s.on) continue;
         if (s.roll > 0) s.roll -= dt;
         else if ((s.t -= dt) <= 0) s.on = false;
       }
       if (state === "count" && (G[CNT]! -= dt) <= 0) {
-        for (const s of tiles) s.on = false;
+        for (let is4 = 0; is4 < tiles.length; is4++) { const s = tiles[is4]!; s.on = false; }
         G[TILE_IN] = 1.2;
         begin();
       }
@@ -1628,8 +1650,21 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     if (state !== "play") return;
     if (G[RES]! > 0) return void (G[RES]! -= dt);
+    G[PLAYED]! += dt;
     // Out of DROPS: the match ends a beat after you go down.
     if (G[OUT_T]! > 0 && (G[OUT_T]! -= dt) <= 0) return void end(false);
+    if (wavesStep()) return;
+    boardStep();
+    ridesStep();
+    foesStep();
+    shellsStep();
+    airStep();
+  }
+  // The step, in parts: each its own function, so a rare branch (a wave turning over, the end)
+  // can only send its own part back to the interpreter, never the whole step.
+  /** The wave: its card, the fight, cleared. True when the match ended. */
+  function wavesStep() {
+    const dt = G[DTS]!;
     // The wave: its card, the fight, cleared.
     G[WAVE_T]! += dt;
     if (G[PHASE] === P_CARD) {
@@ -1647,13 +1682,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         e.events.emit("win", 0);
       }
     } else if ((G[PH_T]! -= dt) <= 0) {
-      if (!embed && !demo && G[WAVE]! >= WAVES) return void end(true);
+      if (!embed && !demo && G[WAVE]! >= WAVES) return end(true), true;
       G[WAVE]!++;
       startWave();
     }
+    return false;
+  }
+  /** Tiles, crates, cover growing back, the power timer, pellets. */
+  function boardStep() {
+    const dt = G[DTS]!;
     // Tiles blink in; crates parachute in.
     if ((G[TILE_IN]! -= dt) <= 0) (lightTile(), (G[TILE_IN] = 1.8 + R() * 2.2));
-    for (const s of tiles) {
+    for (let is5 = 0; is5 < tiles.length; is5++) { const s = tiles[is5]!;
       if (!s.on) continue;
       if (s.roll > 0) s.roll -= dt;
       else if ((s.t -= dt) <= 0) {
@@ -1669,6 +1709,10 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     if (G[POWER]! > 0) G[POWER] = Math.max(0, G[POWER]! - dt);
     // Pellets come back on the simulation clock (Byte Runner).
     for (let p = 0; p < pellets; p++) if (!pelOn[p] && !pelPow[p] && (pelBack[p]! -= dt) <= 0) pelOn[p] = 1;
+  }
+  /** Your rides: respawn, land, timers, controls, pickups. */
+  function ridesStep() {
+    const dt = G[DTS]!;
     // Your rides.
     for (let i = 0; i < 2; i++) {
       const u = crew[i]!;
@@ -1697,11 +1741,11 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       u.hot = Math.max(0, u.hot - dt);
       u.heat = Math.max(0, u.heat - dt * (u.hot > 0 ? 0.7 : 0.45));
       u.bite = Math.max(0, u.bite - dt);
-      pilot(u, dt);
+      pilot(u);
       if (u.charge > 0) {
         if (!where(u.chargeT)) u.charge = 0;
         else {
-          turretTo(u, Math.atan2(F[QY]! - u.y, F[QX]! - u.x), 14 * dt);
+          (F[TT] = Math.atan2(F[QY]! - u.y, F[QX]! - u.x)), (F[TM] = 14 * dt), turretF(u);
           if ((u.charge -= dt) <= 0) fireRail(u);
         }
       }
@@ -1710,7 +1754,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       u.y = Math.max(54, Math.min(H - 18, u.y));
       if (u.kind === PLANE) (u.vx = u.x <= 18 || u.x >= W - 18 ? 0 : u.vx), (u.vy = u.y <= 54 || u.y >= H - 18 ? 0 : u.vy);
       // Tiles and crates under you (the plane swoops low enough to grab them).
-      for (const s of tiles) {
+      for (let is6 = 0; is6 < tiles.length; is6++) { const s = tiles[is6]!;
         if (!s.on || s.roll > 0) continue;
         const x0 = s.c * T, y0 = s.r * T;
         if (u.x >= x0 && u.x <= x0 + T && u.y >= y0 && u.y <= y0 + T && (s.type !== MINE || u.kind === TANK)) takeTile(s, u);
@@ -1732,22 +1776,25 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     }
     // The two rides keep a little apart (a tank can't sit inside the plane's shadow forever).
     if (you.alive && mate.alive && you.drop >= 1 && mate.drop >= 1) {
-      const dx = mate.x - you.x, dy = mate.y - you.y, d = dist(dx, dy), min = 30 * scale;
+      const dx = mate.x - you.x, dy = mate.y - you.y, d = Math.sqrt(dx * dx + dy * dy), min = 30 * scale;
       if (d > 0 && d < min) {
         const k = (min - d) / 2 / d;
         if (you.kind === TANK) (mate.x += dx * k * 2), (mate.y += dy * k * 2);
         else (you.x -= dx * k * 2), (you.y -= dy * k * 2);
       }
     }
-    // Foes.
+  }
+  /** Foes and sites: their moves, contact, the factories and bases. */
+  function foesStep() {
+    const dt = G[DTS]!;
     for (let i = 0; i < MAXF; i++) {
       const f = foes[i]!;
       if (!f.on) continue;
       f.flash = Math.max(0, f.flash - dt);
-      if (f.kind === BUG) bugStep(f, i, dt);
-      else if (f.kind === ALIEN) alienStep(f, dt);
-      else if (f.kind === ETANK) etankStep(f, dt);
-      else flyStep(f, dt);
+      if (f.kind === BUG) bugStep(f, i);
+      else if (f.kind === ALIEN) alienStep(f);
+      else if (f.kind === ETANK) etankStep(f);
+      else flyStep(f);
       if (!f.on) continue;
       // Contact: bugs bite, flies sting (or get eaten when they're blue), your tank squashes small bugs.
       if (f.kind === BUG || f.kind === FLY)
@@ -1780,9 +1827,13 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
           if (u.bite <= 0) (u.bite = 0.9), damage(u, 1);
         }
     }
-    for (let i = 0; i < SITES; i++) if (sites[i]!.on) siteStep(sites[i]!, i, dt);
-    // Shells: swept hits so fast shots never pass through. Guided rounds home in and punch through cover.
-    for (const s of shells) {
+    for (let i = 0; i < SITES; i++) if (sites[i]!.on) siteStep(sites[i]!, i);
+  }
+  /** Shells: swept hits so fast shots never pass through. */
+  function shellsStep() {
+    const dt = G[DTS]!;
+    // Guided rounds home in and punch through cover.
+    for (let is7 = 0; is7 < shells.length; is7++) { const s = shells[is7]!;
       if (!s.on) continue;
       if (s.rail && where(s.tgt)) {
         F[TF] = Math.atan2(s.vy, s.vx);
@@ -1808,7 +1859,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         for (let k = 0; k < 2 && !done; k++) {
           const u = crew[k]!;
           if (!u.alive || u.drop < 1 || (s.kind === K_ETANK && u.kind === PLANE)) continue;
-          if (sweep(s, u.x, u.y)) {
+          if (((F[QX] = u.x), (F[QY] = u.y), sweep(s))) {
             done = true;
             blast(u.x, u.y, s.kind === K_FLAK ? 1 : 0.8, s.kind === K_ALIEN ? 3 : 2);
             damage(u, 1);
@@ -1828,7 +1879,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
           const f = foes[i]!;
           if (!f.on || (s.rail && s.tgt !== i && s.tgt >= 0 && owner.kind === PLANE)) continue;
           if (f.kind === FLY && G[POWER]! > 0) continue; // blue flies: eat them, don't shoot them
-          if (sweep(s, f.x, f.y)) {
+          if (((F[QX] = f.x), (F[QY] = f.y), sweep(s))) {
             done = true;
             blast(f.x, f.y, s.rail ? 1.6 : 0.7, s.rail ? 1 : s.kind === K_BOLT ? 4 : 2);
             hitTarget(i, s.owner, s.kind);
@@ -1837,7 +1888,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         for (let i = 0; i < SITES && !done; i++) {
           const st = sites[i]!;
           if (!st.on || st.hp <= 0) continue;
-          if (inRect(nx, ny, st.x - st.w / 2, st.y - st.h / 2, st.w, st.h)) {
+          if (Math.abs(nx - st.x) <= st.w / 2 && Math.abs(ny - st.y) <= st.h / 2) {
             done = true;
             blast(nx, ny, s.rail ? 1.6 : 0.6, st.kind === FACTORY ? 4 : 1);
             hitTarget(MAXF + i, s.owner, s.kind);
@@ -1858,7 +1909,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
         if (!done && embed && owner.kind === TANK)
           for (const c of covers)
             if (inRect(nx, ny, c.x, c.y, c.w, c.h) && (s.rail || R() < 0.5)) {
-              const d = dist(s.vx, s.vy) || 1;
+              const d = Math.sqrt(s.vx * s.vx + s.vy * s.vy) || 1;
               knock(c, s.vx / d, s.vy / d, s.rail ? 2 : 1.2, false);
               if (!s.rail) {
                 done = true;
@@ -1870,16 +1921,20 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (done) s.on = false;
       else (s.x = nx), (s.y = ny);
     }
+  }
+  /** Airstrikes: bombers fly, bombs drop, blasts follow up. */
+  function airStep() {
+    const dt = G[DTS]!;
     // Airstrikes: bombers fly, bombs drop, blasts follow up.
-    for (const p of bombers) if (p.on && (p.t -= dt) <= 0) p.on = false;
-    for (const p of bombers) if (p.on) (p.x += p.vx * dt), (p.y += p.vy * dt);
-    for (const b of bombs) {
+    for (let ip8 = 0; ip8 < bombers.length; ip8++) { const p = bombers[ip8]!; if (p.on && (p.t -= dt) <= 0) p.on = false; }
+    for (let ip9 = 0; ip9 < bombers.length; ip9++) { const p = bombers[ip9]!; if (p.on) (p.x += p.vx * dt), (p.y += p.vy * dt); }
+    for (let ib10 = 0; ib10 < bombs.length; ib10++) { const b = bombs[ib10]!;
       if (!b.on) continue;
       if (b.wait > 0) b.wait -= dt;
       else if ((b.fall -= dt) <= 0) (b.on = false), detonate(b);
     }
-    for (const m of marks) if (m.on && (m.t -= dt) <= 0) m.on = false;
-    for (const b of booms) if (b.on && (b.t -= dt) <= 0) (b.on = false), blast(b.x, b.y, b.p, b.c);
+    for (let im11 = 0; im11 < marks.length; im11++) { const m = marks[im11]!; if (m.on && (m.t -= dt) <= 0) m.on = false; }
+    for (let ib12 = 0; ib12 < booms.length; ib12++) { const b = booms[ib12]!; if (b.on && (b.t -= dt) <= 0) (b.on = false), blast(b.x, b.y, b.p, b.c); }
   }
 
   // ---------- Taps on the field: an airstrike spot, or a new lock target ----------
@@ -2121,7 +2176,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       waveShown = waveN;
       const w = G[WAVE]!, [name, c, line, pj, tj] = FACTIONS[(w - 1) % 5]!;
       waveCard.style.setProperty("--fc", c);
-      waveCard.innerHTML = `<span class="art">${factionSvg((w - 1) % 5)}</span><small>WAVE ${w}${embed || demo ? "" : ` OF ${WAVES}`}</small><b>${name}</b><p>${line}</p><div class="jobs"><span style="--c:${RIDE_COLOR[PLANE]}">PLANE · ${pj}</span><span style="--c:${RIDE_COLOR[TANK]}">TANK · ${tj}</span></div>`;
+      waveCard.innerHTML = `<span class="art">${factionSvg((w - 1) % 5)}</span><small>WAVE ${w}${embed || demo ? "" : ` OF ${WAVES}`}</small> <b>${name}</b> <p>${line}</p> <div class="jobs"><span style="--c:${RIDE_COLOR[PLANE]}">PLANE · ${pj}</span> <span style="--c:${RIDE_COLOR[TANK]}">TANK · ${tj}</span></div>`;
       if (!demo) {
         const still = calm.matches;
         waveCard.animate?.(
@@ -2548,7 +2603,7 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
       if (!f.on) continue;
       if (f.kind === BUG) {
         const moving = f.vx * f.vx + f.vy * f.vy > 4;
-        drawBug(ctx, f.x, f.y, f.a, f.tier, moving && !calm.matches ? ((now * 10 + f.sub) | 0) % 2 : 0, f.flash > 0, (0.95 + f.tier * 0.25) * (scale / 1.4));
+        drawBug(ctx, f.x, f.y, f.a, f.tier, moving && !calm.matches ? ((now * 10 + f.sub) | 0) % 2 : 0, f.flash > 0, (1.05 + f.tier * 0.28) * (scale / 1.4));
         if (f.tier > 1) for (let k = 0; k < f.tier; k++) (ctx.fillStyle = k < f.hp ? (f.tier === 3 ? "#ff2b4e" : "#ff8a1f") : "rgba(255,255,255,.16)"), ctx.fillRect(f.x - (f.tier * 5 - 2) / 2 + k * 5, f.y + 16 * scale, 3, 3);
       } else if (f.kind === ETANK) {
         drawTank(ctx, f.x, f.y, f.a, f.ta, f.flash > 0 ? "#fff4ff" : ETANK_COLOR, f.tread, f.recoil, false, scale * 0.95);
@@ -2916,12 +2971,18 @@ export function createCrossfire(host: HTMLElement, o: CrossfireOptions = {}) {
     get drops() {
       return G[DROPS]!;
     },
+    /** Seconds of match played (not the start screen, the countdown, a pause or a resume count). */
+    get elapsed() {
+      return G[PLAYED]!;
+    },
     /** Debug / tests: the live world. */
     world: {
       crew, foes, sites, shells, tiles, blocks, bombers, bombs, marks,
       get pellets() {
         return pellets;
       },
+      /** Pellet i on the food pipes: [x, y, on, power square]. */
+      pellet: (i: number) => [pelX[i]!, pelY[i]!, pelOn[i]!, pelPow[i]!],
       get glyphs() {
         return glyphs;
       },

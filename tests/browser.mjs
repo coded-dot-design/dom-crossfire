@@ -1,195 +1,155 @@
-// DOM Crossfire in Chromium, the smoke gate: the arcade shell with its HUD preset plays on a real page.
-// Countdown, then play; keys move the seat; P pauses (the flow's overlay) and resumes; the bar
-// drags; the touch lock holds while it runs; a finished round shows the result; Escape gives the
-// page back exactly. The pause card's SURRENDER key ends the round lost (where the type has it).
-// Reduced motion: the round plays with no sparks. The board page (index.html): PLAY starts the
-// game on it and Escape gives it back. The layout at 1440, 390 and 360: the HUD, the arena and its
-// channel bar never cover the page. On a phone: the touch pad (stick) and the bar on screen.
+// The browser smoke test (Chromium): the landing, the start screen and its ride pick, a match from
+// the countdown through a wave card, the keys, pause (resume, restart, quit, surrender), a won match,
+// and the drop-in on a plain page (Escape gives the page back). Needs npm run check.
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { launch, open, overlay } from "./harness.mjs";
+import { launch, open } from "./harness.mjs";
 
+const SR = 'document.querySelector("#cf").shadowRoot';
+const q = (page, sel, fn = "el => !!el") => page.evaluate(`(${fn})(${SR}.querySelector(${JSON.stringify(sel)}))`);
+const text = (page, sel) => q(page, sel, "el => el ? el.innerText.replace(/\\s+/g, ' ').trim() : ''");
 const browser = await launch(chromium);
-const until = (page, fn, arg, timeout = 8000) => page.waitForFunction(fn, arg, { timeout });
+let where = "landing";
 try {
-  // ---------- Desktop ----------
-  const { page, errors, close } = await open(browser);
-  const before = await page.evaluate(() => document.body.innerHTML);
-  await page.evaluate(() => (window.game = window.mod.createDomCrossfire({ theme: "dark", seed: 7 })).start());
-  let ui = await overlay(page);
-  assert.ok(ui?.bui && ui.bar, "the Board UI kit root and the HUD bar are up");
-  assert.equal(ui.readouts, 4, "the type's readouts are on the bar");
-  for (const k of ["Pause game (P)", "Close game and restore page (Esc)"]) assert.ok(ui.keys.includes(k), `the bar has the ${k} key (${ui.keys})`);
-  // The countdown holds the game's clock, then play starts.
-  assert.equal(await page.evaluate(() => window.game.getSnapshot().elapsed), 0, "nothing runs during the countdown");
-  await until(page, () => window.game.getSnapshot().elapsed > 0.2);
-
-  // The touch lock: no pinch or double-tap zoom while the board is up.
-  assert.equal(await page.evaluate(() => document.documentElement.style.touchAction), "manipulation");
-  assert.ok(await page.evaluate(() => !document.body.dispatchEvent(new Event("gesturestart", { cancelable: true }))), "a pinch gesture is cancelled");
-
-  // Keys move seat 0 (one cell per press on a d-pad game).
-  const seat = () => page.evaluate(() => [window.game.world.s[0], window.game.world.s[1]]);
-  const s0 = await seat();
-  for (const key of ["ArrowRight", "ArrowUp"]) (await page.keyboard.down(key), await page.waitForTimeout(220), await page.keyboard.up(key), await page.waitForTimeout(60));
-  const s1 = await seat();
-  assert.ok(s1[0] !== s0[0] || s1[1] !== s0[1], `the seat moved (${s0} → ${s1})`);
-  await page.keyboard.press("Space");
-
-  // P pauses: the flow's overlay; P again resumes.
-  await page.keyboard.press("KeyP");
-  await until(page, () => window.game.getSnapshot().status === "paused");
-  await until(page, () => /PAUSED/.test(document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui-overlay")?.textContent ?? ""));
-  const t = await page.evaluate(() => window.game.getSnapshot().elapsed);
-  await page.waitForTimeout(400);
-  assert.equal(await page.evaluate(() => window.game.getSnapshot().elapsed), t, "paused: the clock holds");
-  await page.keyboard.press("KeyP");
-  await until(page, () => window.game.getSnapshot().status === "running");
-
-  // The bar drags (in-page scoreboards always drag), from its readouts, not a key.
-  const rect = () => page.evaluate(() => { const r = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui > section").getBoundingClientRect(); return [r.x, r.y]; });
-  const grab = await page.evaluate(() => { const r = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui > section .bui-readouts").getBoundingClientRect(); return [r.x + 4, r.y + r.height / 2]; });
-  const r0 = await rect();
-  await page.mouse.move(grab[0], grab[1]);
-  await page.mouse.down();
-  await page.mouse.move(grab[0] - 120, grab[1] + 160, { steps: 6 });
-  await page.mouse.up();
-  const r1 = await rect();
-  assert.ok(Math.abs(r1[0] - r0[0] + 120) < 4 && Math.abs(r1[1] - r0[1] - 160) < 4, `the bar followed the pointer (${r0} → ${r1})`);
-
-  // A finished round: the result card (and the best score kept on this device).
-  await page.evaluate(() => window.game.finish(true));
-  await until(page, () => window.game.getSnapshot().status === "won");
-  ui = await overlay(page);
-  assert.ok(ui.sticker.length > 0, "the result sticker is up");
-  assert.ok(ui.result.length > 0, `the result lists the round (${ui.result})`);
-  assert.equal(await page.evaluate(() => document.body.innerHTML), before, "the round ended: the page is already back");
-
-  // Recall: Escape gives the page back exactly, gestures included.
-  await page.keyboard.press("Escape");
-  await until(page, () => !document.querySelector("[data-fizlet-host]"));
-  assert.equal(await page.evaluate(() => document.body.innerHTML), before, "Recall gives the page back exactly");
-  assert.equal(await page.evaluate(() => document.documentElement.style.touchAction), "", "the page's gestures are back");
-  assert.ok(await page.evaluate(() => document.body.dispatchEvent(new Event("gesturestart", { cancelable: true }))), "pinch is the page's again");
-  assert.deepEqual(errors, []);
-  await close();
-
-  // ---------- Surrender: the pause card's white flag ends the round, lost ----------
-  if (true) {
-    const s = await open(browser);
-    await s.page.evaluate(() => (window.game = window.mod.createDomCrossfire({ seed: 7 })).start());
-    await until(s.page, () => window.game.getSnapshot().elapsed > 0.2);
-    await s.page.keyboard.press("KeyP");
-    await until(s.page, () => window.game.getSnapshot().status === "paused");
-    await s.page.evaluate(() => document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui-overlay [data-k=surrender]").click());
-    await until(s.page, () => window.game.getSnapshot().status === "gameover");
-    assert.ok((await overlay(s.page)).sticker.length > 0, "the result sticker is up after the flag");
-    await s.page.evaluate(() => window.game.stop());
-    assert.deepEqual(s.errors, []);
-    await s.close();
+  // The landing: one h1, the hero battle, the four armies, the drop-in snippet, the byline.
+  {
+    const { page, errors, close } = await open(browser, { url: "/", width: 1440, height: 900 });
+    await page.waitForFunction(() => window.crossfireDemo);
+    const l = await page.evaluate(() => ({
+      h1: document.querySelectorAll("h1").length,
+      armies: [...document.querySelectorAll(".cf-army h3")].map((h) => h.textContent),
+      images: [...document.images].map((i) => i.src),
+      snippet: document.querySelector("#drop code").textContent,
+      byline: /Chris Cooley/.test(document.querySelector(".site-foot").textContent),
+      play: document.querySelector(".start-key").getAttribute("href"),
+    }));
+    assert.equal(l.h1, 1, "one h1");
+    assert.deepEqual(l.armies, ["The swarm", "The button factories", "The fortified bases", "The food pipes", "All four at once"]);
+    for (const src of new Set(l.images)) assert.equal(await page.evaluate(async (u) => (await fetch(u)).status, src), 200, `${src} loads`);
+    assert.match(l.snippet, /dom-crossfire\.js/);
+    assert.ok(l.byline, "by Chris Cooley");
+    assert.equal(l.play, "./play/");
+    assert.ok(await page.evaluate(() => window.crossfireDemo.world.foes.some((f) => f.on) || window.crossfireDemo.world.sites.some((s) => s.on)), "the hero battle has the armies in it");
+    assert.deepEqual(errors, []);
+    await close();
   }
+  // The start screen: pick a ride (remembered), your partner is the other one.
+  where = "start screen";
+  {
+    const { page, errors, close } = await open(browser, { url: "/play/", width: 1440, height: 900 });
+    await page.waitForFunction(() => window.crossfire?.state === "intro");
+    assert.equal(await text(page, ".sticker b"), "CROSSFIRE");
+    const picks = await page.evaluate(`[...${SR}.querySelectorAll("[data-ride]")].map((b) => [b.dataset.ride, b.getAttribute("aria-pressed")])`);
+    assert.deepEqual(picks, [["tank", "false"], ["plane", "true"]], "the plane is picked by default");
+    assert.equal(await text(page, "[data-mate]"), "YOUR AI PARTNER: THE TANK");
+    await page.evaluate(`${SR}.querySelector("[data-ride=tank]").click()`);
+    assert.equal(await text(page, "[data-mate]"), "YOUR AI PARTNER: THE PLANE");
+    assert.equal(await page.evaluate(() => localStorage.getItem("crossfire:ride")), "tank", "the pick is remembered");
+    assert.equal(await page.evaluate(() => window.crossfire.ride), "tank");
+    assert.equal(await text(page, "[data-ll]"), "LONG", "the tank's special is LONG");
+    await page.evaluate(`${SR}.querySelector("[data-ride=plane]").click()`);
+    assert.equal(await text(page, "[data-ll]"), "SALVO", "the plane's special is SALVO");
+    assert.ok(await q(page, ".legend", "el => !el.hidden"), "the waves legend shows on desktop");
 
-  // ---------- Reduced motion: the same round, no sparks ----------
-  const calm = await open(browser, { reducedMotion: "reduce" });
-  const calmBefore = await calm.page.evaluate(() => document.body.innerHTML);
-  await calm.page.evaluate(() => (window.game = window.mod.createDomCrossfire({ seed: 7 })).start());
-  await until(calm.page, () => window.game.getSnapshot().elapsed > 0.2);
-  await calm.page.keyboard.down("Space");
-  await calm.page.keyboard.down("ArrowLeft");
-  await calm.page.waitForTimeout(1500);
-  await calm.page.keyboard.up("ArrowLeft");
-  await calm.page.keyboard.up("Space");
-  assert.equal(await calm.page.evaluate(() => window.game.getSnapshot().particles ?? 0), 0, "no sparks under reduced motion");
-  await calm.page.evaluate(() => window.game.finish(false));
-  await until(calm.page, () => window.game.getSnapshot().status === "gameover");
-  await calm.page.keyboard.press("Escape");
-  await until(calm.page, () => !document.querySelector("[data-fizlet-host]"));
-  assert.equal(await calm.page.evaluate(() => document.body.innerHTML), calmBefore, "Recall under reduced motion");
-  assert.deepEqual(calm.errors, []);
-  await calm.close();
+    // PRESS START: the kit's launch, the countdown, then wave 1's card.
+    where = "match";
+    await page.evaluate(`${SR}.querySelector("[data-go]").click()`);
+    await page.waitForFunction(() => window.crossfire.state === "count");
+    await page.waitForFunction(() => window.crossfire.state === "play", null, { timeout: 6000 });
+    await page.waitForFunction(`${SR}.querySelector("[data-wave] b")?.textContent === "SWARM PROTOCOL"`);
+    assert.match(await text(page, "[data-wave]"), /^WAVE 1 OF 5 SWARM PROTOCOL Bugs eat the letters .* PLANE · .* TANK · /);
+    assert.equal(await text(page, "[data-wv]"), "1/5");
+    assert.equal(await text(page, "[data-wl]"), "SWARM");
+    assert.equal(await text(page, "[data-pn]"), "TANK", "the partner's readout is the tank");
+    // Fly and fire with the keyboard: you move, your guns shoot.
+    await page.waitForFunction(() => window.crossfire.world.crew[0].drop >= 1, null, { timeout: 5000 });
+    const y0 = await page.evaluate(() => window.crossfire.world.crew[0].y);
+    await page.keyboard.down("KeyW");
+    await page.keyboard.down("Space");
+    await page.waitForTimeout(600);
+    await page.keyboard.up("KeyW");
+    const fired = await page.evaluate(() => window.crossfire.world.shells.filter((s) => s.on && s.owner === 0 && !s.foe).length);
+    await page.keyboard.up("Space");
+    assert.ok((await page.evaluate(() => window.crossfire.world.crew[0].y)) < y0 - 30, "W flies you up");
+    assert.ok(fired > 0, `Space fires (${fired} bolts in the air)`);
+    // The partner fights on its own.
+    await page.waitForFunction(() => window.crossfire.world.crew[1].alive && window.crossfire.world.crew[1].drop >= 1, null, { timeout: 6000 });
+    await page.waitForFunction(() => window.crossfire.world.foes.some((f) => f.on), null, { timeout: 8000 });
 
-  // ---------- The board page: PLAY starts the game on it, Escape gives it back ----------
-  const board = await open(browser, { url: "/index.html", entry: null });
-  const boardBefore = await board.page.evaluate(() => document.querySelector("main").innerHTML);
-  await board.page.click("#play");
-  await until(board.page, () => window.game?.getSnapshot().elapsed > 0.2);
-  assert.ok((await board.page.evaluate(() => window.game.getSnapshot().board?.indexed ?? 0)) > 0, "the board page's words are the board");
-  await board.page.keyboard.press("Escape");
-  await until(board.page, () => !document.querySelector("[data-fizlet-host]"));
-  assert.equal(await board.page.evaluate(() => document.querySelector("main").innerHTML), boardBefore, "the board page is back exactly");
-  assert.deepEqual(board.errors, []);
-  await board.close();
-
-  // ---------- Layout: the HUD, the arena and its channel bar never cover the page ----------
-  // The board page at 1440, 390 and 360 while playing: the HUD clears the H1 and the arena, the
-  // arena block (bezel, screen and the channel bar when it shows) clears every page text block,
-  // the channel banner sits inside the arena, and Recall scrolls back to where PLAY was pressed.
-  const WW = 768, WH = 576; // the world (src/world.ts)
-  for (const [width, height, touch] of [[1440, 900, false], [390, 844, true], [360, 740, true]]) {
-    const at = `${width} px`, lay = await open(browser, { url: "/index.html", entry: null, width, height, touch });
-    const p = lay.page, mainBefore = await p.evaluate(() => document.querySelector("main").innerHTML);
-    const y0 = await p.evaluate(() => (document.getElementById("play").scrollIntoView({ block: "center" }), scrollY));
-    await p.click("#play");
-    await until(p, () => window.game?.getSnapshot().elapsed > 0.2);
-    // A channel change, so the banner is up (the hero kept alive for it).
-    await p.evaluate(() => { const w = window.game.world; w.s[5] = 1; w.g[4] = 29.5; });
-    await until(p, () => /\b[ab]\b/.test(document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".sk-ban").className));
-    await p.waitForTimeout(400);
-    const r = await p.evaluate(([WW, WH]) => {
-      const box = (b) => ({ x: b.left, y: b.top, r: b.right, b: b.bottom }), root = document.querySelector("[data-fizlet-host]").shadowRoot;
-      const [k, x, y] = window.game.view;
-      const visible = (b) => b.r > b.x && b.b > b.y && b.b > 0 && b.y < innerHeight;
-      return {
-        k,
-        hud: box(root.querySelector(".sk").getBoundingClientRect()),
-        h1: box(document.querySelector("h1").getBoundingClientRect()),
-        // The bezel (10 world units round the screen) and the channel bar (to WH + 42) under it.
-        arena: { x: x - 10 * k, y: y - 10 * k, r: x + (WW + 10) * k, b: y + (WH + (k > 0.75 ? 42 : 16)) * k },
-        screen: { x, y, r: x + WW * k, b: y + WH * k },
-        guide: k > 0.75 ? { x, y: y + (WH + 18) * k, r: x + WW * k, b: y + (WH + 42) * k } : null,
-        banner: box(root.querySelector(".sk-ban").getBoundingClientRect()),
-        text: [...document.querySelectorAll("main :is(h1,h2,p,li,footer,.row)")].map((el) => [el.tagName + " " + el.textContent.trim().slice(0, 24), box(el.getBoundingClientRect())]).filter(([, b]) => visible(b)),
-      };
-    }, [WW, WH]);
-    const meets = (a, b) => a.x < b.r && b.x < a.r && a.y < b.b && b.y < a.b;
-    const show = (b) => `${Math.round(b.x)},${Math.round(b.y)} → ${Math.round(b.r)},${Math.round(b.b)}`;
-    assert.ok(r.k > 0.3, `${at}: the arena has a playable size (scale ${r.k})`);
-    assert.ok(!meets(r.hud, r.h1), `${at}: the HUD (${show(r.hud)}) clears the H1 (${show(r.h1)})`);
-    assert.ok(!meets(r.hud, r.arena), `${at}: the HUD (${show(r.hud)}) clears the arena (${show(r.arena)})`);
-    assert.ok(r.h1.y >= 0, `${at}: the H1 is on screen (${show(r.h1)})`);
-    for (const [name, b] of r.text) {
-      assert.ok(!meets(r.arena, b), `${at}: the arena block (${show(r.arena)}) clears "${name}" (${show(b)})`);
-      if (r.guide) assert.ok(!meets(r.guide, b), `${at}: the channel bar (${show(r.guide)}) clears "${name}" (${show(b)})`);
-    }
-    assert.ok(width > 600 ? r.guide : true, `${at}: the channel bar shows on a wide screen`);
-    const s = r.screen, n = r.banner;
-    assert.ok(n.x >= s.x && n.r <= s.r && n.y >= s.y && n.b <= s.b, `${at}: the channel banner (${show(n)}) sits inside the arena (${show(s)})`);
-    if (touch) {
-      // Game mode on a phone: the pad sits on the arena's block, not on the page's copy.
-      const pad = await p.evaluate(() => { const b = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui-pad").getBoundingClientRect(); return { x: b.left, y: b.top, r: b.right, b: b.bottom }; });
-      for (const [name, b] of r.text) assert.ok(!meets(pad, b), `${at}: the pad (${show(pad)}) clears "${name}" (${show(b)})`);
-      assert.ok(pad.y >= s.b, `${at}: the pad (${show(pad)}) sits under the arena (${show(s)})`);
-    }
-    await p.keyboard.press("Escape");
-    await until(p, () => !document.querySelector("[data-fizlet-host]"));
-    assert.equal(await p.evaluate(() => document.querySelector("main").innerHTML), mainBefore, `${at}: the page is back exactly`);
-    assert.equal(await p.evaluate(() => document.documentElement.getAttribute("style")), null, `${at}: the page's padding is back`);
-    assert.ok(Math.abs((await p.evaluate(() => scrollY)) - y0) <= 1, `${at}: Recall scrolls back to where PLAY was pressed (${y0})`);
-    assert.deepEqual(lay.errors, []);
-    await lay.close();
+    // Pause: P, the kit overlay, RESUME counts back in; RESTART; QUIT TO MENU.
+    where = "pause";
+    await page.keyboard.press("KeyP");
+    await page.waitForFunction(() => window.crossfire.state === "paused");
+    assert.match(await text(page, "[data-ov]"), /BATTLE PAUSED PAUSED RESUME RESTART QUIT TO MENU SURRENDER/);
+    await page.evaluate(`${SR}.querySelector("[data-resume]").click()`);
+    assert.equal(await page.evaluate(() => window.crossfire.state), "play");
+    await page.waitForFunction(`${SR}.querySelector("[data-c]")?.textContent === "3"`, null, { timeout: 2000 }); // resume counts down first
+    await page.waitForTimeout(200);
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => window.crossfire.state === "paused");
+    await page.evaluate(`${SR}.querySelector("[data-surrender]").click()`);
+    await page.waitForFunction(() => window.crossfire.state === "end", null, { timeout: 5000 });
+    assert.match(await text(page, "[data-ov]"), /WHITE FLAG GAME OVER SCORE \d+ WAVES 0 \/ 5 YOU · PLANE .* PARTNER · TANK .* PLAY AGAIN SWAP RIDES/);
+    await page.evaluate(`${SR}.querySelector("[data-new]").click()`);
+    await page.waitForFunction(() => window.crossfire.state === "intro");
+    assert.ok(await q(page, "[data-ride=plane]"), "SWAP RIDES goes back to the start screen");
+    assert.deepEqual(errors, []);
+    await close();
   }
-
-  // ---------- Phone ----------
-  const phone = await open(browser, { width: 390, height: 844, touch: true });
-  await phone.page.evaluate(() => (window.game = window.mod.createDomCrossfire({ theme: "light", seed: 7 })).start());
-  ui = await overlay(phone.page);
-  assert.ok(ui.pad && ui.stick, `the touch pad (${"stick"}) is up on a phone`);
-  const bar = await phone.page.evaluate(() => { const r = document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bui > section").getBoundingClientRect(); return [r.left, r.right, r.top]; });
-  assert.ok(bar[0] >= 0 && bar[1] <= 390 && bar[2] >= 0, `the bar fits a 390 px screen (${bar})`);
-  await phone.page.evaluate(() => window.game.stop());
-  assert.deepEqual(phone.errors, []);
-  await phone.close();
-  console.log(`DOM Crossfire (shooter): countdown, moves, pause, the bar drags, touch lock, result, Recall, ${true ? "surrender, " : ""}reduced motion, board page, layout at 1440, 390 and 360, phone pad.`);
+  // A won match: a one-wave board, the wave cleared (every foe and site down), STAGE CLEAR.
+  where = "win";
+  {
+    const { page, errors, close } = await open(browser, { url: "/play/", width: 1280, height: 800 });
+    const r = await page.evaluate(async () => {
+      window.crossfire.destroy();
+      const { createCrossfire } = await import("/dist/dom-crossfire.mjs");
+      let result = null;
+      const g = (window.crossfire = createCrossfire(document.getElementById("cf"), { seed: 4, waves: 1, ride: "tank", onEnd: (x) => (result = x) }));
+      g.engine.stop();
+      g.start();
+      g.world.steps(60 * 4); // countdown, then the wave card
+      g.world.wave(2);
+      g.world.steps(60 * 3);
+      for (const f of g.world.foes) f.on = false;
+      for (const s of g.world.sites) s.hp = 0;
+      g.world.steps(60 * 4); // cleared: the bonus, then the result
+      g.engine.advance(1 / 60);
+      return { state: g.state, result, score: g.score };
+    });
+    assert.equal(r.state, "end");
+    assert.equal(r.result.won, true);
+    assert.equal(r.result.ride, "tank");
+    assert.ok(r.score >= 300, `the wave bonus is in the score (${r.score})`);
+    await page.waitForTimeout(300);
+    assert.match(await text(page, "[data-ov]"), /STAGE CLEAR YOU WIN/);
+    assert.deepEqual(errors, []);
+    await close();
+  }
+  // The drop-in on a plain page: the toggle, the page is the arena, Escape gives it back.
+  where = "drop-in";
+  {
+    const { page, errors, close } = await open(browser, { url: "/host", width: 1280, height: 800 });
+    const before = await page.evaluate(() => document.body.innerHTML);
+    await page.addScriptTag({ url: "/dist/dom-crossfire.js" });
+    await page.waitForFunction(() => window.DomCrossfire);
+    // The drop-in waits behind its key (open: false).
+    await page.evaluate(() => window.DomCrossfire.install({ ride: "tank" }).open());
+    await page.waitForFunction(() => document.querySelector("[data-fizlet-host]")?.shadowRoot?.querySelector(".bz.embed"));
+    await page.waitForTimeout(1500);
+    const live = await page.evaluate(() => getComputedStyle(document.querySelector("[data-fizlet-host]").shadowRoot.querySelector(".bz")).position);
+    assert.equal(live, "fixed", "the drop-in covers the page");
+    await page.keyboard.press("Escape");
+    await page.waitForFunction(() => !document.querySelector("[data-fizlet-host]"));
+    await page.waitForTimeout(1100);
+    const after = await page.evaluate(() => document.body.innerHTML.replace(/<div data-crossfire-ignore="">.*?<\/div>/g, ""));
+    assert.equal(after.replace(/<script[^>]*><\/script>/g, ""), before.replace(/<script[^>]*><\/script>/g, ""), "the page is exactly as it was");
+    assert.deepEqual(errors, []);
+    await close();
+  }
+  console.log("DOM Crossfire browser test green: landing, start screen and ride pick, countdown, wave card, keys, partner, pause, surrender, a won match, the drop-in.");
+} catch (err) {
+  console.error(`browser test failed at: ${where}`);
+  throw err;
 } finally {
   await browser.close();
 }

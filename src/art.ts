@@ -197,10 +197,12 @@ export function flySprites(doc: Document) {
 }
 
 // ---------- Bugs (Swarm Protocol): a round-shelled bug, six legs that scuttle, three tiers ----------
-const BUG = ["...1....1...", "....1..1....", "....2222....", "...222222...", "...233332...", "..23333332..", "..23333332..", "..22333322..", "...233332...", "....2222....", "............"];
-const BUG_LEGS = [["1..........1", ".1........1.", "1..........1"], [".1........1.", "1..........1", ".1........1."]];
+// 1 leg or antenna, 2 the dark rim and the shell's seam, 3 the shell, 4 its highlight.
+const BUG = ["..1......1..", "...1....1...", "....2222....", "...233332...", "..23444432..", "..23422432..", "..23422432..", "..23422432..", "..23422432..", "..23344332..", "...233332...", "....2222...."];
+const BUG_LEGS = [["11........11", ".1........1.", "11........11"], [".1........1.", "11........11", ".1........1."]];
 /** Tier colours: a fresh bug, a grown one (6 letters), a button hunter (12). */
 export const BUG_COLORS = ["#b48cff", "#ff8a1f", "#ff2b4e"];
+const BUG_LIGHT = ["#e6d9ff", "#ffcf9e", "#ff9fb0"];
 export function bugSprites(doc: Document) {
   const cache = new Map<number, HTMLCanvasElement>();
   return (ctx: Ctx, x: number, y: number, a: number, tier: number, frame: number, flash: boolean, scale = 1) => {
@@ -208,19 +210,12 @@ export function bugSprites(doc: Document) {
     let tile = cache.get(key);
     if (!tile) {
       tile = doc.createElement("canvas");
-      tile.width = 14;
-      tile.height = 13;
-      const c = tile.getContext("2d")!, col = flash ? "#ffffff" : BUG_COLORS[tier - 1]!;
-      const put = (k: number, r: number, v: string) => {
-        if (v === ".") return;
-        c.fillStyle = v === "1" ? col : v === "2" ? "#101010" : flash ? "#ffffff" : col;
-        c.fillRect(k + 1, r + 1, 1, 1);
-      };
-      // A dark rim first, so the bug reads on a light board too.
-      c.fillStyle = "#07060f";
-      BUG.forEach((row, r) => [...row].forEach((v, k) => v !== "." && c.fillRect(k, r, 3, 3)));
+      tile.width = 12;
+      tile.height = 12;
+      const c = tile.getContext("2d")!, col = flash ? "#ffffff" : BUG_COLORS[tier - 1]!, hi = flash ? "#ffffff" : BUG_LIGHT[tier - 1]!;
+      const put = (k: number, r: number, v: string) => v !== "." && ((c.fillStyle = v === "2" ? "#07060f" : v === "4" ? hi : col), c.fillRect(k, r, 1, 1));
       BUG.forEach((row, r) => [...row].forEach((v, k) => put(k, r, v)));
-      BUG_LEGS[frame]!.forEach((row, r) => [...row].forEach((v, k) => put(k, 4 + r * 2, v)));
+      BUG_LEGS[frame]!.forEach((row, r) => [...row].forEach((v, k) => put(k, 5 + r * 2, v)));
       cache.set(key, tile);
     }
     ctx.save();
@@ -228,7 +223,7 @@ export function bugSprites(doc: Document) {
     ctx.rotate(a + Math.PI / 2);
     ctx.scale(scale, scale);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(tile, -14, -13, 28, 26);
+    ctx.drawImage(tile, -12, -12, 24, 24);
     ctx.restore();
   };
 }
@@ -267,10 +262,11 @@ export function flySvg(kind: number) {
 }
 /** A bug at a tier (1-3) as an SVG. */
 export function bugSvg(tier: number) {
-  const col = BUG_COLORS[tier - 1]!, out: [number, number, string][] = [];
-  BUG.forEach((row, r) => [...row].forEach((v, k) => v !== "." && out.push([k, r, v === "2" ? "#101010" : col])));
-  BUG_LEGS[0]!.forEach((row, r) => [...row].forEach((v, k) => v !== "." && out.push([k, 4 + r * 2, col])));
-  return `<svg viewBox="-1 -1 14 13" aria-hidden="true" shape-rendering="crispEdges">${rects(out)}</svg>`;
+  const col = BUG_COLORS[tier - 1]!, hi = BUG_LIGHT[tier - 1]!, out: [number, number, string][] = [];
+  const put = (k: number, r: number, v: string) => v !== "." && out.push([k, r, v === "2" ? "#07060f" : v === "4" ? hi : col]);
+  BUG.forEach((row, r) => [...row].forEach((v, k) => put(k, r, v)));
+  BUG_LEGS[0]!.forEach((row, r) => [...row].forEach((v, k) => put(k, 5 + r * 2, v)));
+  return `<svg viewBox="0 0 12 12" aria-hidden="true" shape-rendering="crispEdges">${rects(out)}</svg>`;
 }
 /** Each wave's face: 0 Swarm Protocol's bug, 1 Null Invaders' squid, 2 Sherman Bytes' tank,
  *  3 Byte Runner's fly, 4 Crossfire: all four. */
