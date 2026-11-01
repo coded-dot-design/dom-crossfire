@@ -1,6 +1,6 @@
 // Size budgets, gzip, measured. The game (engine bricks, the Board UI kit CSS, the cast, the rules)
 // ships as one file each way; the pages' glue is its own small file.
-// 0.2.0 (v2, on Battlefield Blitz): measured 50,640 B (dom-crossfire.js) and 50,666 B (dom-crossfire.mjs),
+// 0.2.0 (v2, on Battlefield Blitz): measured 50,646 B (dom-crossfire.js) and 50,672 B (dom-crossfire.mjs),
 // page.js 2,761 B; budgets are those plus a little headroom. The first cut was 39,980 / 39,773 B.
 import { gzipSync } from "node:zlib";
 import { readFileSync } from "node:fs";

@@ -22,7 +22,7 @@ v2: started over on Battlefield Blitz (pending owner review).
   with Blitz's phone game mode. The Pages workflow also publishes `play/`.
 - **Gates:** 0 minor GCs in 20,000 steps (attract and board), replay determinism, each army's
   rules, the settle guard (the hero rests off screen), the browser test and the phone test (390×844,
-  844×390). Size: 50,640 B gzip (drop-in), 50,666 B (module); the first cut was 39,980 / 39,773 B.
+  844×390). Size: 50,646 B gzip (drop-in), 50,672 B (module); the first cut was 39,980 / 39,773 B.
 
 ## Unreleased (first cut, superseded by 0.2.0)
 
