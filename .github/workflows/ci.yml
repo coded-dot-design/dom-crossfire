@@ -17,8 +17,10 @@ jobs:
       # vendor/fizlet is a committed snapshot (npm run sync); CI builds and checks what is in the repo.
       - run: npm run check
       - run: node -e "const p=require('./package.json'); if (Object.keys(p.dependencies||{}).length) { console.error('DOM Crossfire ships no runtime dependencies'); process.exit(1) }"
-      # The sim allocates nothing in a step.
-      - run: npm test
       - run: npx playwright install --with-deps chromium
+      # The step allocates nothing (0 minor GCs in 20,000 steps), a seed replays its match, and each
+      # army plays like its own game.
+      - run: npm test
       - run: npm run test:settle
+      # The landing, the start screen, a match, pause, a win, the drop-in; then phones (game mode).
       - run: npm run test:browser

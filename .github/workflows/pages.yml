@@ -23,12 +23,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       # dist/ is built here, not committed: typecheck, build, size budget.
       - run: npm run check
-      # The board page (index.html) and the game it loads (./dist/dom-crossfire.mjs, plus the one-script build).
+      # The landing (index.html), the play page (play/) and what they load (dist/: the game, the
+      # drop-in, the styles, the art, the shots); the shots also at /shots/ (the OG image's address).
       - name: Assemble the site
         run: |
-          mkdir -p artifacts/pages/dist
+          mkdir -p artifacts/pages
           cp index.html artifacts/pages/
-          cp dist/* artifacts/pages/dist/
+          cp -r play dist artifacts/pages/
+          cp -r dist/shots artifacts/pages/shots
           ls -R artifacts/pages
       # The custom domain is set in Settings → Pages; the CNAME file records it with the site.
       # Repo variable SITE_URL overrides the default.
