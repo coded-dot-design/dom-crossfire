@@ -1,0 +1,54 @@
+name: Deploy DOM Crossfire site
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      # dist/ is built here, not committed: typecheck, build, size budget.
+      - run: npm run check
+      # The board page (index.html) and the game it loads (./dist/dom-crossfire.mjs, plus the one-script build).
+      - name: Assemble the site
+        run: |
+          mkdir -p artifacts/pages/dist
+          cp index.html artifacts/pages/
+          cp dist/* artifacts/pages/dist/
+          ls -R artifacts/pages
+      # The custom domain is set in Settings → Pages; the CNAME file records it with the site.
+      # Repo variable SITE_URL overrides the default.
+      - name: CNAME for the custom domain
+        run: node -e 'console.log(new URL(process.env.SITE_URL).host)' > artifacts/pages/CNAME && cat artifacts/pages/CNAME
+        env:
+          SITE_URL: ${{ vars.SITE_URL || 'https://crossfire.domvirus.com' }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: artifacts/pages
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish the site
+        id: deployment
+        uses: actions/deploy-pages@v4
