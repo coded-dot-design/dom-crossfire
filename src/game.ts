@@ -3,7 +3,7 @@
 // game's type picks (./type: skirmish, the bar with its match flow: countdown, pause / surrender,
 // result; the bar drags). This file only wires the shell to the simulation (./sim, ./rules):
 // inputs become bits in the read phase, the sim steps on the fixed step, render draws and reacts.
-import { arcade, skirmishHud, KX, KY, FIRE as FIRE_ON, VW, VH, MODE, PX, PY, PON, type ArcadeController, type ArcadeOptions } from "../vendor/fizlet/arcade";
+import { arcade, skirmishHud, KX, KY, FIRE as FIRE_ON, MODE, PX, PY, PON, type ArcadeController, type ArcadeOptions } from "../vendor/fizlet/arcade";
 import type { Engine } from "../vendor/fizlet/kernel/engine";
 import type { FizEvent } from "../vendor/fizlet/kernel/ring";
 import { ACTIONS, FIRE, HUD, NET_HUD, PAD } from "./type";
@@ -41,7 +41,7 @@ export function createDomCrossfire(o: Options = {}) {
   const me = o.net?.slot ?? 0;
   let w: World | null = null;
   // view: scale, x offset, y offset (world → viewport); quake: screen shake in px. Render only.
-  const view = new Float64Array(3), quake = new Float64Array(1);
+  const view = new Float64Array(3), quake = new Float64Array(1), lay = new Float64Array(10);
   const ctl: ArcadeController<Stats> = arcade<Stats>({
     id: "dom-crossfire",
     title: "DOM Crossfire",
@@ -73,6 +73,37 @@ export function createDomCrossfire(o: Options = {}) {
         }
         return encode(x, y, c[FIRE_ON]! > 0, act >= 0 && input.down(act));
       };
+      // The page makes room: the HUD's height on top (padding), and the arena with its channel bar
+      // in a block of its own after the page's title (a phone's block runs to the screen's bottom,
+      // so the pad sits on it, not on the copy). Through the ledger: Recall takes both back, and
+      // the page scrolls back to where it was.
+      const doc = document, body = doc.body, e = ctx.engine, sr = e.root!.shadowRoot!, ban = sr.querySelector<HTMLElement>(".sk-ban")!, h1 = body.querySelector("h1");
+      const slot = e.ledger.add(doc.createElement("div")), y0 = scrollY, top = sr.querySelector(".sk")!.getBoundingClientRect().bottom + 12;
+      h1 ? h1.after(slot) : body.prepend(slot);
+      e.ledger.style(doc.documentElement, "padding-top", top + "px");
+      e.signal.addEventListener("abort", () => queueMicrotask(() => scrollTo(0, y0))); // after the ledger's restore
+      // lay: the viewport's w, h; the slot's page top; its height to set (0: set); the scale; -;
+      // scrollY; the banner's y. Measured in read, written in render.
+      const fit = () => {
+        const vw = innerWidth, vh = innerHeight, r = slot.getBoundingClientRect(), pad = sr.querySelector(".bui-pad")?.getBoundingClientRect();
+        const room = vh - top - (h1 ? r.top - h1.getBoundingClientRect().top : 0), foot = pad ? vh - pad.top + 8 : 16;
+        const k = Math.min((vw - 20) / (WW + 20), Math.max((room - foot) / (WH + 52), 0.35), 1.6), h = (WH + 52) * k;
+        (lay[0] = vw), (lay[1] = vh), (lay[2] = r.top + scrollY), (lay[4] = k);
+        lay[3] = pad ? Math.max(h + 16, room) : h + 16;
+      };
+      // Render: the slot's height when it changed, the arena's place (view) and the channel banner
+      // inside the arena, never on the page's copy.
+      const place = () => {
+        const k = lay[4]!;
+        lay[3] && ((slot.style.height = lay[3] + "px"), (lay[3] = 0));
+        (view[0] = k), (view[1] = (lay[0]! - WW * k) / 2), (view[2] = lay[2]! - lay[6]! + 10 * k);
+        const y = Math.round(view[2]! + WH * k * 0.1);
+        if (y !== lay[7]) ban.style.top = (lay[7] = y) + "px";
+      };
+      fit(), place();
+      scrollTo(0, (h1 ?? slot).getBoundingClientRect().top + scrollY - top);
+      (lay[6] = scrollY), place(); // for the countdown: the banner is up before the first frame
+      e.add({ read: () => ((lay[6] = scrollY), (lay[0] !== innerWidth || lay[1] !== innerHeight) && fit()) });
       if (o.net) o.net.wire(ctx.engine, mine, (e, inputs) => step(world, inputs, e.dt), () => hashOf(world));
       else {
         const inputs = new Uint32Array(1);
@@ -94,11 +125,12 @@ export function createDomCrossfire(o: Options = {}) {
           else if (ev.type === "dud" && ev.a === me) ctx.say("This cartridge has no fire button. Eat the bytes, dodge the flies.", 2200);
         },
         draw(g: CanvasRenderingContext2D, dt: number) {
-          // The world, fitted and centred in the viewport (every screen plays the same match), on a
-          // CRT: a dark screen in a Board UI bezel, so it reads the same on light and dark pages.
+          // The world, fitted into the page's arena block (fit, in read) and centred (every screen
+          // plays the same match), on a CRT: a dark screen in a Board UI bezel, so it reads the same
+          // on light and dark pages.
           const calm = ctx.reduced(), time = ctx.engine.time, wg = world.g, cart = wg[CART]! | 0;
-          const k = Math.min(c[VW]! / WW, (c[VH]! - 150) / (WH + 40), 1.6) * 0.96;
-          (view[0] = k), (view[1] = (c[VW]! - WW * k) / 2), (view[2] = Math.max(8, (c[VH]! - WH * k) / 2));
+          place();
+          const k = view[0]!;
           const shake = calm ? 0 : quake[0]!;
           quake[0] = Math.max(0, shake - dt * 40);
           g.save();
@@ -139,6 +171,8 @@ export function createDomCrossfire(o: Options = {}) {
     finish(won: boolean) {
       if (w && !o.net) w.g[OVER] = won ? 2 : 1;
     },
+    /** The arena's place on screen: scale, x, y of the world's origin (tests and tools). */
+    view,
     /** The live world (read-only by convention): tests and tools. */
     get world() {
       return w;
