@@ -9,6 +9,10 @@
   a click under it, mid-field, reaches the game. It no longer drags, either.
 - Browser test: a held click on the field fires, and a click under the scoreboard reaches the
   field, for both rides.
+- The step's effects (blasts, words, puffs) and damage now go through the step's registers, and the
+  rides' part of the step is split into small functions, so it stays at 0 minor GCs in 20,000 steps
+  as the match changes (CI's Chrome 145 had counted 3 with the first version of this fix).
+- Size: 50,739 B gzip (drop-in), 50,785 B (module).
 
 ## 0.2.0
 
