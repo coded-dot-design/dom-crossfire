@@ -1,0 +1,42 @@
+name: Tag a past release
+# One-off, run by hand (Actions → Tag a past release): tags v<version> at a commit on main whose
+# package.json has that version. It only creates a tag that does not exist yet; it never moves one.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version in package.json at that commit (e.g. 0.2.0)
+        required: true
+      sha:
+        description: Full 40-character commit SHA on main
+        required: true
+permissions:
+  contents: read
+jobs:
+  tag:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - env:
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -eu
+          echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "not a version: $VERSION"; exit 1; }
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$' || { echo "not a full SHA: $SHA"; exit 1; }
+          git merge-base --is-ancestor "$SHA" origin/main || { echo "$SHA is not on main"; exit 1; }
+          found="$(git show "$SHA:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
+          [ "$found" = "$VERSION" ] || { echo "package.json at $SHA is $found, not $VERSION"; exit 1; }
+          tag="v$VERSION"
+          git fetch origin --tags
+          if git show-ref --verify --quiet "refs/tags/$tag" || git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists; not moving it"; exit 1
+          fi
+          git tag "$tag" "$SHA"
+          git push origin "refs/tags/$tag"

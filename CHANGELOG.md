@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- CI: a push to main tags the release (`v<version>` from `package.json`) when that tag doesn't
+  exist yet. A hand-run workflow, "Tag a past release", tags earlier versions at their merge commits;
+  it never moves a tag.
+
 ## 0.4.0
 
 - **Squad play, 2 to 4 people** (`/play/squad/`), co-op only. Each person picks the plane or the
