@@ -26,3 +26,20 @@ jobs:
       - run: npm run test:browser
       # Squad play: 2-4 people in lockstep (in memory, then through the squad page on a stand-in room server).
       - run: npm run test:squad
+  # When package.json's version changes on main, tag it v<version> (never moves an existing tag).
+  tag-version:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          tag="v$(node -p 'require("./package.json").version')"
+          git fetch origin --tags
+          if git show-ref --verify --quiet "refs/tags/$tag"; then exit 0; fi
+          git tag "$tag"
+          git push origin "$tag"
