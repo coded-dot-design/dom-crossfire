@@ -109,7 +109,9 @@ npm run play           # the site on localhost (index.html and play/)
 The site is static: `index.html` (the landing), `play/index.html` (the game page) and `dist/`
 (built in CI: the game, the drop-in, `site.css` from `site/site.css` on the Board UI kit, `page.js`
 from `site/page.js`, the pixel art from `src/art.ts`). Cloudflare Pages serves them on
-crossfire.fzlt.games (it serves the custom domain, so there is no `CNAME` file).
+crossfire.fzlt.games (`npm run site:build` assembles `artifacts/pages`; `.github/workflows/cloudflare.yml` deploys a PR to a
+preview, `main` to staging on crossfire-staging.fzlt.games with `PUBLIC_DEPLOY_TARGET=staging`, noindex, and a promoted
+green `main` SHA to production; no `CNAME` file).
 
 `src/game.ts` is the game (Blitz's `game.ts` reshaped: the crew, the four armies, the waves);
 `src/art.ts` is the cast as pixel data. `vendor/fizlet` is a committed snapshot of Fizlet's source

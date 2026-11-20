@@ -3,14 +3,14 @@
 //   /play/       the game and /play/squad/ (play/)
 //   /dist/       what the pages load (the game, the drop-in, the styles, the art, the shots)
 //   /shots/      the shots again (the OG image's address)
-// The same files pages.yml assembles for GitHub Pages. Two variables, both optional:
+// .github/workflows/cloudflare.yml builds it for each target. Two variables, both optional:
 //   SITE_URL (+ SITE_BASE)  where the site is served: the pages' own address (canonical, share tags,
 //                           JSON-LD, the drop-in snippet) follows it. Unset: the address in the pages.
 //   PUBLIC_DEPLOY_TARGET    staging (Cloudflare staging and PR previews): every page is noindex, nofollow.
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const HOME = "https://crossfire.domvirus.com/";
+const HOME = "https://crossfire.fzlt.games/";
 const out = "artifacts/pages";
 if (!existsSync("dist/dom-crossfire.js")) throw Error("Build the game first (npm run check).");
 rmSync(out, { recursive: true, force: true });
