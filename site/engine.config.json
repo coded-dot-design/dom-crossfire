@@ -1,5 +1,5 @@
 {
-  "$comment": "astro-base-engine config for the DOM Crossfire site (a DOM VIRUS board game, by Chris Cooley; hub: https://domvirus.com/). Run the engine with --site site. brand.siteUrl is the live GitHub Pages address until crossfire.domvirus.com is pointed; targets.production carries the domain (fe launch checks it). The landing page is the game's own page at / (the brief's type is game), and it loads the game, so scripts are expected there. No analytics or tracking ids here.",
+  "$comment": "Astro page engine config for the DOM Crossfire site (a DOM VIRUS board game, by Chris Cooley; hub: https://domvirus.com/). Run the engine with --site site. brand.siteUrl is the live GitHub Pages address until crossfire.domvirus.com is pointed; targets.production carries the domain (fe launch checks it). The landing page is the game's own page at / (the brief's type is game), and it loads the game, so scripts are expected there. No analytics or tracking ids here.",
   "brand": {
     "name": "DOM Crossfire",
     "siteUrl": "https://coded-dot-design.github.io/dom-crossfire",
