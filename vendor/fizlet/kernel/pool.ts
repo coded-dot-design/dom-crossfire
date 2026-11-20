@@ -5,16 +5,16 @@ import { need } from "./need";
 export class Pool<T> {
   readonly cap: number;
   readonly items: T[] = [];
-  private readonly free: T[] = [];
+  private readonly f: T[] = []; // the free items (short: esbuild keeps property names)
   constructor(cap: number, create: () => T) {
     this.cap = need(cap, "pool cap", 2);
-    for (let i = 0; i < cap; i++) this.free.push(create());
+    for (let i = 0; i < cap; i++) this.f.push(create());
   }
   get size() {
     return this.items.length;
   }
   acquire(): T | undefined {
-    const item = this.free.pop();
+    const item = this.f.pop();
     if (item !== undefined) this.items.push(item);
     return item;
   }
@@ -24,7 +24,7 @@ export class Pool<T> {
     if (item === undefined) return false;
     const last = items.pop()!;
     if (i < items.length) items[i] = last;
-    this.free.push(item);
+    this.f.push(item);
     return true;
   }
   release(item: T) {

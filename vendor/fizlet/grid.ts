@@ -6,7 +6,8 @@
  * Not collision: @fzlt/core/collide's `Grid` re-buckets moving bodies every step; a `Board` holds the
  * ground they move over. Use the same cell size for both and a body's collide bucket is its cell.
  * The size is checked at setup: `cols` and `rows` are positive integers, `cell` a finite number > 0
- * (a RangeError names all three).
+ * (a RangeError names all three). A search (`path`, `flood`, `los`, `hit`) checks its cell ids: an id
+ * that is not an integer on the board throws `fizlet/grid: cell … is not on the board`.
  */
 
 /** Flags: BLOCKED stops movement and sight, COVER stops sight (pass it in a mask), OCCUPIED marks
@@ -59,8 +60,8 @@ export class Board {
 
   constructor(cols: number, rows: number, opts: BoardOptions = {}) {
     const n = (this.cols = cols) * (this.rows = rows), cell = (this.cell = opts.cell ?? 1);
-    if (!(cols >= 1 && rows >= 1 && cols % 1 === 0 && rows % 1 === 0 && cell > 0 && cell - cell === 0 && typeof cols + typeof rows + typeof cell == "numbernumbernumber"))
-      throw new RangeError(`fizlet/grid: cols ${cols}, rows ${rows}, cell ${cell}`);
+    if (!(cols >= 1 && rows >= 1 && cols === (cols | 0) && rows === (rows | 0) && cell > 0 && Number.isFinite(cell)))
+      throw new RangeError(`fizlet/grid: cols ${cols}, rows ${rows}, cell ${cell} is not a board`);
     this.diagonal = !!opts.diagonal;
     this.terrain = new Uint8Array(n);
     this.cost = new Uint8Array(n).fill(1);
@@ -125,6 +126,7 @@ export class Board {
    * Cells with any `avoid` flag are walls, except that the goal may be OCCUPIED.
    */
   path(from: number, to: number, out: Int32Array, budget = 0, avoid = BLOCKED | OCCUPIED) {
+    this.c(from), this.c(to);
     this.partial = false;
     if (from === to) return 0;
     if (this.flags[to]! & BLOCKED) return -1;
@@ -144,6 +146,7 @@ export class Board {
    * (capped at out.length). `dist(i)` then reads each cell's cost.
    */
   flood(from: number, max: number, out: Int32Array, avoid = BLOCKED | OCCUPIED) {
+    this.c(from);
     this.r(from, -1, avoid, max * 10, 0, out);
     return this.b;
   }
@@ -160,6 +163,7 @@ export class Board {
   /** The first cell strictly between a and b (walking from a) with a `mask` flag, or -1 if clear.
    *  Bresenham over cells: what a shot hits on its way. */
   hit(a: number, b: number, mask = BLOCKED) {
+    this.c(a), this.c(b);
     const cols = this.cols, x1 = b % cols, y1 = (b - x1) / cols;
     let x = a % cols, y = (a - x) / cols;
     const dx = Math.abs(x1 - x), dy = -Math.abs(y1 - y), sx = x < x1 ? 1 : -1, sy = y < y1 ? 1 : -1;
@@ -171,6 +175,13 @@ export class Board {
       if (e2 >= dy) (e += dy), (x += sx);
       if (e2 <= dx) (e += dx), (y += sy);
     }
+  }
+
+  // A cell id a search starts or ends on must be an integer on the board: anything else (NaN, a
+  // fraction, a string, off the board) never meets the walk's end test, so it throws here instead of
+  // looping forever (S6 P2-01). Inline, not the kernel's `need`: grid runs without the kernel.
+  private c(i: number) {
+    if (!(this.flags[i]! >= 0 && i === (i | 0))) throw new RangeError(`fizlet/grid: cell ${i} is not on the board`);
   }
 
   // The search: A* toward `to`, or Dijkstra over everything within `limit` when to < 0 (flood).

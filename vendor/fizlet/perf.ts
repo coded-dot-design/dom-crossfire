@@ -39,11 +39,13 @@ export const WINDOW = 500;
 
 /** The last `cap` frame times (ms) in a typed array: `push` never allocates. */
 export class FrameRing {
+  readonly cap: number;
   readonly ms: Float32Array;
   /** The next slot written. */
   head = 0;
   size = 0;
-  constructor(readonly cap: number) {
+  constructor(cap: number) {
+    this.cap = cap; // a plain field, not a parameter property: src/ is erasable (tests/erasable.test.mjs)
     this.ms = new Float32Array(cap);
   }
   push(ms: number) {
@@ -69,8 +71,8 @@ const fmt = (i: number) => {
   const t = +(i === 1 || i === 3), k = Math.round(t ? out[i]! * 10 : out[i]!);
   return k >= 0 && k < 1024 ? (cache[t]![k] ??= t ? ((k / 10) | 0) + "." + (k % 10) : "" + k) : "" + Math.round(out[i]!);
 };
-// Running numbers in one typed array: updating them never boxes a number.
-const WT = 0, WN = 1, WS = 2, DROP = 3, FRAMES = 4;
+// Running numbers in one typed array: updating them never boxes a number. Slots, literals named in a comment (src/kernel/engine.ts says why):
+// 0 WT, 1 WN, 2 WS, 3 DROP, 4 FRAMES.
 const LABELS = ["FPS", "MS", "DROP", "WORK", "LIVE", "MB"];
 // Board UI tokens: go / hurt / critical bars (under 1.25, 2 and over 2 budgets), the budget line.
 const VARS = ["--k-go", "--hurt", "--critical", "--line"], TONES = ["#39ffb0", "#ffc21a", "#f0506e", "#3b3170"];
@@ -95,46 +97,47 @@ export function perf(engine: Engine, o: PerfOptions = {}) {
     "</div>";
   const el = tpl.firstChild as HTMLElement, canvas = el.firstChild as HTMLCanvasElement, dpr = Math.min(3, Math.max(1, globalThis.devicePixelRatio || 1));
   const cw = (canvas.width = Math.round(BARS * dpr)), ch = (canvas.height = Math.round(36 * dpr)), ctx = canvas.getContext("2d");
-  const tones = TONES.slice(), texts = [...el.querySelectorAll("b")].map((b) => b.firstChild as Text);
+  const tones = [...TONES], texts = [...el.querySelectorAll("b")].map((b) => b.firstChild as Text);
   let on = false, dead = false;
 
   const write = () => {
-    const n = s[WN]!, heap = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
-    out[0] = n ? (n * 1000) / s[WT]! : 0;
-    out[1] = n ? s[WT]! / n : 0;
-    out[2] = s[DROP]!;
-    out[3] = n ? s[WS]! / n : 0;
+    const n = s[1 /* WN */]!, heap = (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory;
+    out[0] = n ? (n * 1000) / s[0 /* WT */]! : 0;
+    out[1] = n ? s[0 /* WT */]! / n : 0;
+    out[2] = s[3 /* DROP */]!;
+    out[3] = n ? s[2 /* WS */]! / n : 0;
     out[4] = engine.live;
     out[5] = heap ? heap.usedJSHeapSize / 1048576 : 0;
     for (let i = 0; i < 6; i++) L.text(texts[i]!, i < 5 || heap ? fmt(i) : "--");
   };
   const draw = () => {
     if (!ctx) return;
-    const bw = cw / BARS, top = budget * 3, x0 = (BARS - ring.size) * bw;
+    const bw = cw / BARS, top = budget * 3, x0 = cw - ring.size * bw; // the newest bar ends at the right edge
     ctx.clearRect(0, 0, cw, ch);
     let tone = -1;
     for (let k = 0; k < ring.size; k++) {
-      const i = ring.slot(k), v = ring.ms[i]!, h = Math.max(dpr, Math.min(1, v / top) * ch), c = v <= budget * 1.25 ? 0 : v <= budget * 2 ? 1 : 2;
+      const v = ring.ms[ring.slot(k)]!, h = Math.max(dpr, Math.min(1, v / top) * ch), c = v <= budget * 1.25 ? 0 : v <= budget * 2 ? 1 : 2;
       if (c !== tone) ctx.fillStyle = tones[(tone = c)]!;
       ctx.fillRect(x0 + k * bw, ch - h, bw, h);
     }
-    // The budget line, over the bars: anything that pokes above it was a slow frame.
+    // The budget line, over the bars (1 budget of the chart's 3, so 2/3 of the way down): anything
+    // that pokes above it was a slow frame.
     ctx.fillStyle = tones[3]!;
-    ctx.fillRect(0, Math.round(ch - (budget / top) * ch) - dpr, cw, dpr);
+    ctx.fillRect(0, Math.round((ch * 2) / 3) - dpr, cw, dpr);
   };
   const system = engine.add({
     render() {
       const d = clock[0]! * 1000, w = clock[1]!;
       if (!(d > 0)) return; // the first frame after a pause or a settle has no interval
       ring.push(d);
-      s[WT]! += d;
-      s[WN]!++;
-      s[WS]! += w;
-      s[DROP]! += missed(d, budget);
-      s[FRAMES]!++;
-      if (s[WT]! >= WINDOW) {
+      s[0 /* WT */]! += d;
+      s[1 /* WN */]!++;
+      s[2 /* WS */]! += w;
+      s[3 /* DROP */]! += missed(d, budget);
+      s[4 /* FRAMES */]!++;
+      if (s[0 /* WT */]! >= WINDOW) {
         if (on) write();
-        s[WT] = s[WN] = s[WS] = 0;
+        s[0 /* WT */] = s[1 /* WN */] = s[2 /* WS */] = 0;
       }
       if (on) draw();
     },
@@ -147,7 +150,7 @@ export function perf(engine: Engine, o: PerfOptions = {}) {
     L.attr(el, "aria-hidden", on ? null : "true");
     if (on) {
       // Read the tokens where it sits (a .bui root or a palette may change them); not in a step.
-      const cs = typeof getComputedStyle === "function" ? getComputedStyle(el) : null;
+      const cs = globalThis.getComputedStyle?.(el); // none in a worker or a bare test runtime
       for (let i = 0; i < VARS.length; i++) tones[i] = cs?.getPropertyValue(VARS[i]!).trim() || TONES[i]!;
       // A static host: its corner is not the overlay's (absolute goes to some ancestor). Relative
       // while shown, through the ledger (given back on hide and by Recall).
@@ -180,11 +183,11 @@ export function perf(engine: Engine, o: PerfOptions = {}) {
     },
     /** Frames recorded (0-length frames after a pause are not frames). */
     get frames() {
-      return s[FRAMES]!;
+      return s[4 /* FRAMES */]!;
     },
     /** Dropped frames so far. */
     get dropped() {
-      return s[DROP]!;
+      return s[3 /* DROP */]!;
     },
     /** Remove the overlay, its key and its system; the engine keeps running. */
     destroy,

@@ -7,8 +7,13 @@
 import type { Engine, System } from "./kernel/engine";
 import { seeded } from "./kernel/random";
 
-/** Wire kinds. Every message is 12 bytes: kind, slot, players, 0, u32 frame (or seed), u32 value. */
-export const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4;
+/** Wire kinds. Every message is 12 bytes: kind, slot, players, mode, u32 frame (or seed), u32 value
+ *  (or token). From the room: WELCOME, LEAVE, RESUME (a seat is back: resend), AWAY (a seat dropped and
+ *  may come back), LOBBY (before the start: your seat, room size, seated); START goes to the room from
+ *  the host (the protocol: /guides/build-your-own-room-server/). */
+export const INPUT = 1, HASH = 2, WELCOME = 3, LEAVE = 4, RESUME = 5, AWAY = 6, START = 7, LOBBY = 8;
+const m12 = (k: number, s: number, a = 0, b = 0) => Uint8Array.of(k, s, a, b, 0, 0, 0, 0, 0, 0, 0, 0);
+const u32 = (d: Uint8Array, i: number) => (d[i]! | (d[i + 1]! << 8) | (d[i + 2]! << 16) | (d[i + 3]! << 24)) >>> 0;
 
 /** Moves 12-byte messages to the room (or the other peers) and back. */
 export interface Transport {
@@ -40,7 +45,7 @@ export interface PresenceOptions {
   hashEvery?: number;
 }
 
-const FRAME = 0, STALLS = 1, DROPPED = 2, DESYNC = 3, LOST = 4;
+// Stats slots, literals named in a comment (src/kernel/engine.ts says why): 0 FRAME, 1 STALLS, 2 DROPPED, 3 DESYNC, 4 LOST, 5 GONE. Message types: the exported INPUT…LOBBY.
 
 /** Lockstep multiplayer on engine `e`: each sim frame waits for every player's input (sent `delay`
  *  frames ahead), so peers never drift; state hashes are compared to catch a desync. Read `frame`,
@@ -53,8 +58,8 @@ export function presence(e: Engine, o: PresenceOptions) {
   // One ring slot per (player, frame % cap): the frame it holds and the bits; same for hashes.
   const tag = new Int32Array(P * C).fill(-1), bits = new Uint32Array(P * C);
   const htag = new Int32Array(P * C).fill(-1), hval = new Uint32Array(P * C);
-  const now = new Uint32Array(P), n = new Int32Array(5), out = new Uint8Array(12);
-  n[DESYNC] = -1;
+  const now = new Uint32Array(P), n = new Int32Array(6), out = new Uint8Array(12);
+  n[3 /* DESYNC */] = -1;
   const put = (s: number, f: number, b: number) => ((tag[s * C + (f % C)] = f), (bits[s * C + (f % C)] = b));
   for (let s = 0; s < P; s++) for (let f = 0; f < D; f++) put(s, f, 0);
   const send = (k: number, f: number, v: number) => {
@@ -64,38 +69,46 @@ export function presence(e: Engine, o: PresenceOptions) {
   };
   const check = (s: number, f: number, h: number) => {
     const i = f % C;
-    for (let j = 0; j < P; j++) if (j !== s && htag[j * C + i] === f && hval[j * C + i] !== h >>> 0 && n[DESYNC]! < 0) n[DESYNC] = f;
+    for (let j = 0; j < P; j++) if (j !== s && htag[j * C + i] === f && hval[j * C + i] !== h >>> 0 && n[3 /* DESYNC */]! < 0) n[3 /* DESYNC */] = f;
     htag[s * C + i] = f;
     hval[s * C + i] = h;
   };
   const receive = (d: Uint8Array) => {
-    const k = d[0], s = d[1]!, f = d[4]! | (d[5]! << 8) | (d[6]! << 16) | (d[7]! << 24);
-    if (d.length < 12 || s >= P || s === me) return;
+    const k = d[0]!, s = d[1]!, f = u32(d, 4) | 0, F = n[0 /* FRAME */]!, i = s * C + (f % C);
+    if (d.length < 12 || s >= P) return;
+    // The room's word on a seat (this one too): LEAVE, RESUME (back: resend this seat's inputs
+    // F-D..F+D-1, which a peer may have missed while a link was down; in lockstep no peer is more
+    // than D frames away; repeats are dropped, first write wins) or AWAY (dropped, may come back).
+    if (k > 3 && k < 7) {
+      n[5 /* GONE */]! &= ~(1 << s);
+      if (k > 5) n[5 /* GONE */]! |= 1 << s;
+      else if (k < 5) n[4 /* LOST */]! |= 1 << s;
+      else for (let g = F > D * 2 ? F - D : D; g < F + D; g++) if (tag[me * C + (g % C)] === g) send(INPUT, g, bits[me * C + (g % C)]!);
+    }
     // First write wins: a second INPUT or HASH for a frame a seat already sent is dropped, so a
     // peer that sends two different inputs for one frame can't split the others' sims.
-    const i = s * C + (f % C);
-    if (k === LEAVE) n[LOST]! |= 1 << s;
-    else if (k === INPUT && f >= n[FRAME]! && f < n[FRAME]! + C && tag[i] !== f) put(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
-    else if (k === HASH && f > n[FRAME]! - C && f < n[FRAME]! + C && htag[i] !== f) check(s, f, d[8]! | (d[9]! << 8) | (d[10]! << 16) | (d[11]! << 24));
-    else n[DROPPED]!++;
+    else if (s === me) return;
+    else if (k === INPUT && f >= F && f < F + C && tag[i] !== f) put(s, f, u32(d, 8));
+    else if (k === HASH && f > F - C && f < F + C && htag[i] !== f) check(s, f, u32(d, 8));
+    else n[2 /* DROPPED */]!++;
   };
   const system: System = {
     step(e) {
-      const f = n[FRAME]!;
+      const f = n[0 /* FRAME */]!;
       for (let s = 0; s < P; s++) {
         const i = s * C + (f % C);
-        if (tag[i] !== f) return void n[STALLS]!++; // lockstep: wait, never guess
+        if (tag[i] !== f) return void n[1 /* STALLS */]!++; // lockstep: wait, never guess
         now[s] = bits[i]!;
       }
       const b = o.input() >>> 0;
       put(me, f + D, b);
-      send(INPUT, f + D, b);
+      send(1 /* INPUT */, f + D, b);
       o.step(e, now, f);
-      n[FRAME] = f + 1;
+      n[0 /* FRAME */] = f + 1;
       if (o.hash && (f + 1) % every === 0) {
         const h = o.hash() >>> 0;
         check(me, f + 1, h);
-        send(HASH, f + 1, h);
+        send(2 /* HASH */, f + 1, h);
       }
     },
   };
@@ -107,23 +120,27 @@ export function presence(e: Engine, o: PresenceOptions) {
     system,
     /** Sim frames run so far (every peer passes the same frames, maybe at different times). */
     get frame() {
-      return n[FRAME]!;
+      return n[0 /* FRAME */]!;
     },
     /** Engine steps spent waiting for someone's input. */
     get stalls() {
-      return n[STALLS]!;
+      return n[1 /* STALLS */]!;
     },
     /** Messages refused (out of the window, bad seat, a second input or hash for one frame). */
     get dropped() {
-      return n[DROPPED]!;
+      return n[2 /* DROPPED */]!;
     },
     /** First frame whose state hash differed from a peer's, or -1. */
     get desync() {
-      return n[DESYNC]!;
+      return n[3 /* DESYNC */]!;
     },
     /** Bitmask of seats the room said left (their frames never arrive: the sim waits). */
     get lost() {
-      return n[LOST]!;
+      return n[4 /* LOST */]!;
+    },
+    /** Bitmask of seats reconnecting (dropped, may come back; this one too, while `join`'s link retries). */
+    get away() {
+      return n[5 /* GONE */]!;
     },
     /** The confirmed input of `slot` for `frame`, or -1 if it isn't known (yet, or any more). */
     confirmed(slot: number, frame: number) {
@@ -194,14 +211,16 @@ export function memory(o: { peers: number; latency?: number; jitter?: number; se
 }
 
 /** Wrap an open-or-opening WebSocket as a transport. Messages before `listen` are kept (≤ 256).
- *  `send` takes presence's 12-byte messages (the room refuses any other size). */
-export function websocket(ws: WebSocket): Transport {
+ *  `send` takes presence's 12-byte messages (the room refuses any other size). `eat` (join's) sees each
+ *  message first and keeps it from the listener when it returns true. */
+export function websocket(ws: WebSocket, eat?: (d: Uint8Array) => unknown): Transport {
   let fn: ((d: Uint8Array) => void) | null = null;
   const early: Uint8Array[] = [];
   ws.binaryType = "arraybuffer";
   ws.addEventListener("message", (ev) => {
     if (typeof ev.data === "string") return;
     const d = new Uint8Array(ev.data as ArrayBuffer);
+    if (eat?.(d)) return;
     if (fn) fn(d);
     else if (early.length < 256) early.push(d);
   });
@@ -213,27 +232,53 @@ export function websocket(ws: WebSocket): Transport {
       fn = f;
       while (f && early.length) f(early.shift()!);
     },
-    close: () => ws.close(),
+    // 1000: a leave (the room holds a seat only for a drop).
+    close: () => ws.close(1000),
   };
 }
 
-/** Join a room (`fizlet-rooms`): resolves when the room is full with your seat and the shared seed.
- *  `protocols` go to the WebSocket handshake: fizlet-rooms reads its invite code there
- *  (`["fizlet-rooms", "invite." + code]`), so the code stays out of the URL and the logs. */
-export function join(url: string, signal?: AbortSignal, protocols?: string | string[]) {
-  return new Promise<{ transport: Transport; slot: number; players: number; seed: number }>((ok, fail) => {
-    const ws = new WebSocket(url, protocols), t = websocket(ws);
-    const bye = () => (t.close(), fail(new Error("presence: room closed")));
-    ws.addEventListener("close", bye);
-    ws.addEventListener("error", bye);
-    signal?.addEventListener("abort", bye);
-    t.listen((d) => {
-      if (d[0] !== WELCOME) return;
-      t.listen(null);
-      ws.removeEventListener("close", bye);
-      ws.removeEventListener("error", bye);
-      signal?.removeEventListener("abort", bye);
-      ok({ transport: t, slot: d[1]!, players: d[2]!, seed: (d[4]! | (d[5]! << 8) | (d[6]! << 16) | (d[7]! << 24)) >>> 0 });
-    });
+/** Options for `join()`. */
+export interface JoinOptions {
+  /** Reconnect tries after a drop, 250 ms apart and doubling (default 6: about 16 s; 0: off). Meanwhile
+   *  `away` has this seat's bit (the others see AWAY); when they run out, `lost` (LEAVE). */
+  retry?: number;
+  /** Called on each LOBBY from the room before the start (on every join and leave): this player's
+   *  `seat`, how many are `seated`, the room `size`. Seat 0 is the host: its `start(seats, mode)` asks
+   *  the room to begin once `seats` are taken (0: now) with the seats it has; `mode` (0..255) reaches
+   *  every peer. Other seats' starts are ignored by the room. */
+  lobby?(start: (seats?: number, mode?: number) => void, seat: number, seated: number, size: number): void;
+}
+
+/** Join a room (a server speaking the `fizlet-rooms` subprotocol): resolves when the room starts with
+ *  your seat, the player count, the shared seed and the host's `mode`. `protocols` go to the WebSocket
+ *  handshake: the room reads its access token there (`["fizlet-rooms", "invite." + code]`), so the code stays out of the URL and the
+ *  logs. A dropped link (1006, or a server restart: 1011, 1012, 1014) reconnects on its own (`o.retry`) with the seat's resume token, kept in
+ *  memory only (never in a URL); the room's own closes (idle, full, seat gone, the caps) end it. */
+export function join(url: string, signal?: AbortSignal, protocols?: string | string[], o: JoinOptions = {}) {
+  return new Promise<{ transport: Transport; slot: number; players: number; seed: number; mode: number }>((ok, fail) => {
+    // tries < 0: closed for good. `cur` is the link to the current socket; `t` outlives it.
+    let cur: Transport, fn: ((d: Uint8Array) => void) | null = null, me = -1, token = 0, tries = 0;
+    const t: Transport = { send: (d) => cur.send(d), listen: (f) => cur.listen((fn = f)), close: () => ((tries = -1), cur.close()) };
+    const bye = () => (t.close(), me < 0 ? fail(new Error("presence: room closed")) : fn?.(m12(LEAVE, me)));
+    const open = (p?: string | string[]) => {
+      const ws = new WebSocket(url, p);
+      // WELCOME and LOBBY are eaten (after a resume, the room's RESUME tells presence to resend).
+      cur = websocket(ws, (d) =>
+        d[0] === LOBBY
+          ? (o.lobby?.((n = 0, m = 0) => t.send(m12(START, 0, n, m)), d[1]!, d[3]!, d[2]!), 1)
+          : d[0] === WELCOME && ((tries = 0), me < 0 && ((me = d[1]!), (token = u32(d, 8)), ok({ transport: t, slot: me, players: d[2]!, seed: u32(d, 4), mode: d[3]! })), 1),
+      );
+      if (fn) cur.listen(fn);
+      // A drop (1006, 1011, 1012, 1014: the server holds the seat) resumes: bits 0, 5, 6, 8 of 0x161 from
+      // 1006. `>>> 0 > 8` keeps the shift in range (JS takes shift counts mod 32). Any other close ends it.
+      ws.onclose = (ev, c = ev.code - 1006) => {
+        if (tries < 0) return;
+        if (me < 0 || !token || tries >= (o.retry ?? 6) || c >>> 0 > 8 || !((0x161 >> c) & 1)) return bye();
+        tries++ || fn?.(m12(AWAY, me));
+        setTimeout(() => tries < 0 || open([...[protocols ?? []].flat(), "resume." + token.toString(16)]), 125 << tries);
+      };
+    };
+    open(protocols);
+    signal?.addEventListener("abort", () => me < 0 && bye());
   });
 }

@@ -1,5 +1,5 @@
 /**
- * @fzlt/core/slot: mount a Fizlet scene into an astro-base-engine slot: the element carrying
+ * @fzlt/core/slot: mount a Fizlet scene into an Astro page engine slot: the element carrying
  *   class="ae-slot" data-slot-target="<page>#<slot>" role="img" aria-label="…". Both shapes the engine
  *   has rendered are found: the figure itself (`<figure class="ae-slot">`), or a box inside one
  *   (`<figure class="ae-slot-figure"><div class="ae-slot">…</div><figcaption class="ae-slot__fallback">`,
@@ -11,7 +11,9 @@
  * - Reduced motion: the slot keeps its placeholder and fallback; the scene never loads. If the
  *   setting turns on while a scene runs, the scene goes and the fallback comes back.
  * - Accessible: role="img" + aria-label stay unless the scene says it renders real accessible
- *   content (`accessible: true`); until then the stage is aria-hidden.
+ *   content (`accessible: true`): then role="img" becomes role="figure" (a <figure>'s own role, so
+ *   the label stays on a role that takes one) in place, and Recall puts "img" back in the same
+ *   spot, byte for byte. Until then the stage is aria-hidden.
  * - Contained: the scene gets its own stage inside the slot (contain: strict). Every change the
  *   slot makes goes through a Ledger, so destroy() gives the page back exactly.
  * - Off screen, off the page's frame: the stage is content-visibility: auto, so a scene scrolled
@@ -24,7 +26,7 @@ import { Ledger } from "./kernel/ledger";
 export interface SlotScene {
   /** Remove the scene (its engine's destroy() restores what it changed). */
   destroy(): void;
-  /** True when the scene renders real accessible content: the slot drops role="img". */
+  /** True when the scene renders real accessible content: the slot's role="img" becomes "figure". */
   accessible?: boolean;
 }
 /** A tap on the slot before the scene was up: where (px from the slot's top left) and when. */
@@ -51,7 +53,7 @@ const REDUCE = "(prefers-reduced-motion: reduce)";
 export const findSlot = (target: string, doc: Document = document) =>
   [...doc.querySelectorAll<HTMLElement>(".ae-slot[data-slot-target]")].find((f) => f.dataset.slotTarget === target) ?? null;
 
-/** Mount a scene into an astro-base-engine slot (`target`: its `data-slot-target` or the element).
+/** Mount a scene into an Astro page engine slot (`target`: its `data-slot-target` or the element).
  *  `load` runs once the slot nears the viewport and the main thread is idle (or on the first tap);
  *  with reduced motion it never loads. Returns `el`, `mounted` and `destroy()`. */
 export function slot(target: string | HTMLElement, load: () => Promise<SlotMount> | SlotMount, opts: SlotOptions = {}) {
@@ -79,10 +81,11 @@ export function slot(target: string | HTMLElement, load: () => Promise<SlotMount
     const id = ++run;
     if (wait > 0 && !first)
       await new Promise<void>((done) => {
-        const t = typeof requestIdleCallback === "function" ? requestIdleCallback(() => go?.(), { timeout: wait }) : setTimeout(() => go?.(), 1);
+        // One test for the pair: a page with requestIdleCallback has cancelIdleCallback.
+        const idle = typeof requestIdleCallback === "function", t = idle ? requestIdleCallback(() => go?.(), { timeout: wait }) : setTimeout(() => go?.(), 1);
         go = () => {
           go = null;
-          typeof cancelIdleCallback === "function" ? cancelIdleCallback(t) : clearTimeout(t);
+          idle ? cancelIdleCallback(t) : clearTimeout(t);
           done();
         };
         ctl.signal.addEventListener("abort", go, { once: true });
@@ -98,7 +101,9 @@ export function slot(target: string | HTMLElement, load: () => Promise<SlotMount
     el.append(stage);
     scene = make(stage, el, first);
     first = null;
-    if (scene.accessible) ledger.attr(el, "role", null);
+    // Changed in place, not removed: a removed attribute set again goes last, and Recall would not
+    // be byte-exact (the attribute order would differ).
+    if (scene.accessible) ledger.attr(el, "role", "figure");
     else stage.setAttribute("aria-hidden", "true");
   }
   function arm() {

@@ -1,9 +1,21 @@
 {
   "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
   "repository": "https://github.com/coded-dot-design/fizlet",
-  "version": "0.21.2",
-  "commit": "2922cbd9856c0584aa2e1925e8cf1999838e09e6",
+  "version": "0.27.0",
+  "commit": "d372e26bd2719ed595928c4373f044ee6c4b349e",
   "files": [
+    {
+      "path": "actor.ts",
+      "sha256": "851772774019717acdae6ef7054e432e8c69f7782de231dbc1469da733e86227"
+    },
+    {
+      "path": "aim.ts",
+      "sha256": "000725d1e0cddba05bcdefb920d644d5b57b77231a0445c8388cfd8dae06d4b7"
+    },
+    {
+      "path": "announce.ts",
+      "sha256": "41c9e5636a4335bc41bc3921ad7da74351ca25ed819c8124fe39d4cec8bea8bd"
+    },
     {
       "path": "arcade-parts.ts",
       "sha256": "a13122dbe27d03d96698fdb089b48a85e54e5db5c168732bdf3c913bc3e817d2"
@@ -14,15 +26,23 @@
     },
     {
       "path": "arcade.ts",
-      "sha256": "0f3154de8a31c376c56d9c07930a41920ad86fc81b7755dac60e28ec3e1b4a34"
+      "sha256": "ac48cdc7dfa4ff98fbb22aa015adaa2926ab69413ebf84ed92d2efdd9a61588d"
+    },
+    {
+      "path": "beam.ts",
+      "sha256": "06d903392ddd8d9d7687f4d01d9f19a5fb096c8b45f5ba35257f24949dd07536"
     },
     {
       "path": "board-page.ts",
-      "sha256": "bc0a451d1185417318aed80b8c23bca930d6700d9f8fb905966fa1ae859f7c99"
+      "sha256": "38e1f613de3027a8b8662e6c277ea7737826eb29fe4dca7c841f7a8a3fd8da36"
     },
     {
       "path": "camera.ts",
-      "sha256": "8a9b82d86ed084d93aababb51f4529f8165168ae1e3d60760c7b6ab2867f0c5d"
+      "sha256": "5561329419259c4b513279045c1ccd7882deabd9697df4c9f9b69cb71d15dab6"
+    },
+    {
+      "path": "cards.ts",
+      "sha256": "9bb86d931ad44bdd43ea69469705477a3fac6741b50cf845aaeaef7155ec72ea"
     },
     {
       "path": "coach.ts",
@@ -38,35 +58,51 @@
     },
     {
       "path": "debug.ts",
-      "sha256": "d968d408653ffe3cd629b10083d79e2d8aff1abe7e88eb0bcbae07f419352015"
+      "sha256": "67fbd6aba8f1d94f2eb325284503d7353c244806ca812896c68efe4bdb743c75"
+    },
+    {
+      "path": "dice.ts",
+      "sha256": "188b57a8aea8fc66cb36ddca9ff8ca759439c0b24ea693837a4924aedba7c99e"
+    },
+    {
+      "path": "diorama.ts",
+      "sha256": "1aec6289bb92fa92613e10fd6c438d7324c79b069506a7c45f223b10e3a453f0"
+    },
+    {
+      "path": "drive.ts",
+      "sha256": "21de37d4e488e1bf0ad08d05623f5438cdca1840423b14f06a4b5b4069518bd1"
     },
     {
       "path": "embed.ts",
       "sha256": "2a270582f980d4d4dc92d27249556c2b6ac8ab97fa8c80409446f40bfa743ac5"
     },
     {
+      "path": "flick.ts",
+      "sha256": "a77fa840158fa453f13ed848dc2a4d27e39eb373623031b8823821480f5a8e6d"
+    },
+    {
       "path": "fx.ts",
-      "sha256": "83535c609d6322aeba6d203808c4f1628b9390e49e681141ba85f29404b08815"
+      "sha256": "f6a00219928cd700aad8ebd61eeb038cc5e4f894561aa365000b2810413c1614"
     },
     {
       "path": "grid.ts",
-      "sha256": "cfeb511cb2c507b36d4bf0309d8f34c5e9cf02bdba45425cab6a1220c6dbbfda"
+      "sha256": "e39b1154bc182f2fcdcc7939fe69189ab6f97a7ecc1116b2a252ab015815ff0c"
     },
     {
       "path": "hud.ts",
-      "sha256": "be813ce715d3fbad8fcdf6b558274cd28adf427d45c7fa7f8ef96fe02da0c2f3"
+      "sha256": "f30e29afae3180d4bfa5ca25224eb65b529f7a02ff3157d98e26ad47d0453b34"
     },
     {
       "path": "index.ts",
-      "sha256": "ce583813a38ce1f1dd787fba1dd4077734b1e932789ed4ba2b4c3d736230899c"
+      "sha256": "212d9d75ff2943b82efa175e3f085b71ebd80c64c90b403b0e2480a41feefa30"
     },
     {
       "path": "input.ts",
-      "sha256": "0a638ab936d1697694fc3fc6970ed23d0bbe9f26b6ef71180937d4f8446473c2"
+      "sha256": "f3d08f5ece0cfa52e19346149ec546f29683dc9df626af7aee71674b5f29d2f4"
     },
     {
       "path": "kernel/engine.ts",
-      "sha256": "08009b9722c36858f33ebab00d7ffbcdd27d33abf8a11af523e4c832f2ef856b"
+      "sha256": "413ccda7b327f36aaf52f29f8a03b5a23fd7bed5fa2742d26d94ef1011d3ea70"
     },
     {
       "path": "kernel/index.ts",
@@ -74,15 +110,15 @@
     },
     {
       "path": "kernel/ledger.ts",
-      "sha256": "10677319dde10d3dee138235e800a135fd433a6967de89b5430d567fc9de3f03"
+      "sha256": "777c76c10c36237cdc8647a5073bb1bcd92aebc4e3b63d01f10cfe3c1bb8e3d3"
     },
     {
       "path": "kernel/need.ts",
-      "sha256": "dd7626c7bba10daf4ae0a0aecbd929d1ff9903e6f5be0c3470e51595bb7ee740"
+      "sha256": "9251ae0678c156cd3c9459a3c7714c94e6bc12ff9e2ddaaeb0d6da76437a94f2"
     },
     {
       "path": "kernel/pool.ts",
-      "sha256": "d5201f9d7db9362717614a8cfb1bc519dabecbe981a0cac94740d98cf0998627"
+      "sha256": "b28782b31d27f4e55702fc265a2d5aee17cca7bf09ab9b3c383fde534fdb4c51"
     },
     {
       "path": "kernel/random.ts",
@@ -90,7 +126,7 @@
     },
     {
       "path": "kernel/ring.ts",
-      "sha256": "c2a2c57bf69651ab703ca88c4d2dc65f92a1f7f126caad17f2d7d43211b02449"
+      "sha256": "2bb6a75be21bf365fedd848c5fc8955b9f5918d6ac8dccbebad85be4d0264eb5"
     },
     {
       "path": "layout.ts",
@@ -98,15 +134,19 @@
     },
     {
       "path": "match.ts",
-      "sha256": "d3702b9029a2482c12ada12ca631db432826da807df3a7447fda3a648d391288"
+      "sha256": "46be62feec9be61c4c88114cdbdc1f73a55bd413047a46b17124bcc957094479"
+    },
+    {
+      "path": "math.ts",
+      "sha256": "9ea7c26021706de52ff2237eb5667e0330385a87922a64227f09e3802156f280"
     },
     {
       "path": "pad.ts",
-      "sha256": "f9ed7df5b38143bc3e1c5f1c056ba668f7de4aa377fc353a40d6be2ba81f3cf3"
+      "sha256": "9a5764ab81303281ebcc8f1b45edb807709ed4e692353f2e44952f4a88972379"
     },
     {
       "path": "perf.ts",
-      "sha256": "a2c4d169ff5aa535a6a6aea9cd1166582c4486eca3814c2dbaeceaa86cd8982a"
+      "sha256": "1c247bdd696c05104e49074f7454f96f631765f2ac7712aaa8c60bd2d82fe329"
     },
     {
       "path": "presence-check.ts",
@@ -114,7 +154,15 @@
     },
     {
       "path": "presence.ts",
-      "sha256": "f178459faf643a771acff2bc05aaa003812bc9c1d4d5512faa95fb5b0aa1fe8f"
+      "sha256": "c378d76ee04e63e3ad1ac04bd55489cc9708e639cd241a16325f4ef14887f993"
+    },
+    {
+      "path": "props.ts",
+      "sha256": "861ba13dcea23423841585c20963bb23a2cbb9d429b65df9e58da4e415afd341"
+    },
+    {
+      "path": "rollback.ts",
+      "sha256": "63c22c3d65dc9705b5ca0cb8fc6cc92f95cb0fd61d1c396a99443b3408876b60"
     },
     {
       "path": "rules.ts",
@@ -122,11 +170,11 @@
     },
     {
       "path": "slot.ts",
-      "sha256": "6592cd1d4d368581b2c128ac5e263ec02682f6ba67167da73d1c642e96b5b203"
+      "sha256": "29183153bff6c47672b6c78bfbf2ab41f2ef043b33ab39197fc1eb5a4c21baed"
     },
     {
       "path": "sound.ts",
-      "sha256": "7d6ac6cb4cfed2e0154bb74736392a6f8820ab3a32ba60f6e1e972001e3b0161"
+      "sha256": "6cc5290e3f4d893eb77aea894bfd75c0896fc84a00e726dfc902168295e2a13e"
     },
     {
       "path": "sprite.ts",
@@ -134,19 +182,27 @@
     },
     {
       "path": "steer.ts",
-      "sha256": "9fb2de50ef5af7be4de461da8c37ec884c95bf18b5f1a21e1af9af60839c7549"
+      "sha256": "d8e39a37310483adfd663d3b48128ef785d2c65af1fe991e1ec093dc07977cda"
+    },
+    {
+      "path": "terrain.ts",
+      "sha256": "99989ea88c8cf069dafef6ceccb5c3f6f44386f9d5458c2b37f940911e10f520"
     },
     {
       "path": "timeline.ts",
-      "sha256": "dd796399c28f090ea987e212ca20f581a9f52cf16d0cb6d625d1ddeeb0a0c89e"
+      "sha256": "fa03221a98efbca422f63e9c792f645005a716dbf5b74092dfba3a843a7d89e1"
     },
     {
       "path": "touch.ts",
       "sha256": "bf13132a2db706f0eb1eb5dd482ccdf2e639c58ab5516c8d74331294161fe594"
     },
     {
+      "path": "track.ts",
+      "sha256": "07be0d21f98d004d97070db4933d6247213b1e9be8cafb05277f0b52e57f40c9"
+    },
+    {
       "path": "ui/board-ui.css",
-      "sha256": "87a5297611cef45e68f38b4555386e29fa9a4506b63b921e5f7533838cc19728"
+      "sha256": "0ceab1503af697b5942f07434701d6b446e83ab2f87875e85870128d832e54b0"
     },
     {
       "path": "ui/board-ui.ts",
@@ -159,6 +215,14 @@
     {
       "path": "view-canvas.ts",
       "sha256": "62fa4240f5d23d51a6a04e3be75d94b29262e5f278f254393e8530bc6c6d2575"
+    },
+    {
+      "path": "view-dom.ts",
+      "sha256": "7eae8617e8883d58a3f6d7e8695d1b71ce7bff8a59e3fbf712fcb16bbd6b6efc"
+    },
+    {
+      "path": "water.ts",
+      "sha256": "3948dc1869010cc60376b1b7585a1d208acd6337c2b57cbad431985864b0972e"
     }
   ]
 }

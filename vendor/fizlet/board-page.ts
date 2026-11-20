@@ -10,7 +10,7 @@
  * Targets only (`text: false`) with `still: Infinity`: a scene that reads page elements (headings,
  * buttons) re-measures only when the page moves or changes, so its still frames read nothing.
  */
-import { STEP, RENDER, IDLE, type Engine, type System } from "./kernel/engine";
+import { type Engine, type System } from "./kernel/engine";
 import { Grid } from "./collide";
 import { hypot } from "./steer";
 
@@ -61,6 +61,9 @@ const SKIP = "input,textarea,select,[contenteditable],[aria-live],dialog,[role=d
 const NOT_TEXT = ",option,button,a,script,style,noscript,pre,code";
 let seq = 0;
 
+// boardPage's running numbers `n`: 0 SCANNED, 1 MEASURED, 2 T, 3 NOW; frame phases 0 IDLE, 2 STEP, 3 RENDER.
+// Literals named in a comment, so esbuild ships no variables for them (src/kernel/engine.ts says why).
+
 /** The host page as the board for engine `e`: its glyphs become terrain and food, its buttons
  *  targets. Measured only in the read phase, on a budget; `near()` and `hit()` in a step never read
  *  layout or allocate. `consume()` changes a glyph through the ledger. */
@@ -86,7 +89,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   // The refresh clock: seconds summed from `engine.timing` in read (reading the engine's `time`
   // getter boxed a number every frame: 12 B a frame in steady state).
   const STILL = o.still ?? 0.5;
-  const n = new Float64Array([-9, -9, 2, 0]), SCANNED = 0, MEASURED = 1, T = 2, NOW = 3;
+  const n = new Float64Array([-9, -9, 2, 0]);
 
   const hex = o.color && /^#[\da-f]{3,8}$/i.test(o.color) ? o.color : "", name = "fizlet-board-" + ++seq;
   const hl = hex && win.Highlight && new win.Highlight();
@@ -241,9 +244,9 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   });
 
   function refresh(force?: boolean) {
-    const now = n[NOW]!;
-    if (rescan && (force || now - n[SCANNED]! >= 0.5)) (n[SCANNED] = now), scan(), (force = true);
-    if (force || now - n[MEASURED]! >= (dirty ? 0.08 : STILL)) (n[MEASURED] = now), measure();
+    const now = n[3 /* NOW */]!;
+    if (rescan && (force || now - n[0 /* SCANNED */]! >= 0.5)) (n[0 /* SCANNED */] = now), scan(), (force = true);
+    if (force || now - n[1 /* MEASURED */]! >= (dirty ? 0.08 : STILL)) (n[1 /* MEASURED */] = now), measure();
   }
 
   function nearIn(p: Float64Array, i: number, out: Int32Array) {
@@ -262,7 +265,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
   function hitIn(p: Float64Array, i: number) {
     const x0 = p[i]!, y0 = p[i + 1]!, dx = p[i + 2]! - x0, dy = p[i + 3]! - y0;
     let best = -1;
-    n[T] = 2;
+    n[2 /* T */] = 2;
     qx[0] = x0 + dx / 2;
     qy[0] = y0 + dy / 2;
     qrad[0] = hypot(dx, dy) / 2 + 2; // the exact hypot (K5), as games compute it
@@ -278,13 +281,13 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
           b = Math.min(b, u < v ? v : u);
         } else if (s0 < lo || s0 > hi) a = 2;
       }
-      if (!spent[j] && a <= b && a < n[T]!) (n[T] = a), (best = j);
+      if (!spent[j] && a <= b && a < n[2 /* T */]!) (n[2 /* T */] = a), (best = j);
     }
     return best;
   }
 
   const system: System = {
-    read: () => e.signal.aborted || ((n[NOW] = n[NOW]! + e.timing[0]!), refresh()),
+    read: () => e.signal.aborted || ((n[3 /* NOW */] = n[3 /* NOW */]! + e.timing[0]!), refresh()),
     render() {
       for (let q = 0; q < queued; q++) write(qr[q]!, queue[q]!);
       queued = 0;
@@ -329,11 +332,11 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
      *  glyph is goes in p[i + 4] (and `t`). No number is passed, so nothing boxes. */
     hitAt(p: Float64Array, i: number) {
       const g = hitIn(p, i);
-      p[i + 4] = n[T]!;
+      p[i + 4] = n[2 /* T */]!;
       return g;
     },
     get t() {
-      return n[T]!;
+      return n[2 /* T */]!;
     },
     /** Rescans so far: glyph indices from before a rescan mean nothing after it. */
     get scans() {
@@ -353,7 +356,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
       spent[i] = 1;
       recs[gr[i]!]![4][gk[i]!] = as === "erase" ? 2 : as === "0" ? 3 : as === "1" ? 4 : 1;
       w[i] = h[i] = 0;
-      if (e.phase === RENDER || e.phase === IDLE) write(recs[gr[i]!]!, gk[i]!);
+      if (e.phase === 3 /* RENDER */ || e.phase === 0 /* IDLE */) write(recs[gr[i]!]!, gk[i]!);
       else (qr[queued] = recs[gr[i]!]!), (queue[queued++] = gk[i]!);
       return true;
     },
@@ -364,7 +367,7 @@ export function boardPage(e: Engine, o: BoardPageOptions = {}) {
     /** Rescan and re-measure now; from a step, at the next read. */
     refresh() {
       rescan = 1;
-      if (e.phase === STEP) n[SCANNED] = n[MEASURED] = -9;
+      if (e.phase === 2 /* STEP */) n[0 /* SCANNED */] = n[1 /* MEASURED */] = -9;
       else refresh(true);
     },
     system,

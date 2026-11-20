@@ -19,16 +19,15 @@ type Target = HTMLElement | string;
 export type Src = (() => number) | readonly [ArrayLike<number>, number];
 type Get = (() => number | boolean) | readonly [ArrayLike<number>, number];
 
-const FMTS = ["int", "clock", "rank", "pct"];
-const INT = 0, CLOCK = 1, RANK = 2, PCT = 3;
+const FMTS = ["int", "clock", "rank", "pct"]; // formats 0 INT, 1 CLOCK, 2 RANK, 3 PCT (literals named in a comment: src/kernel/engine.ts says why)
 // Formatted strings for 0..1023 per format, made once on first use: a readout that comes back to
 // a value it showed before (a clock, a score that drops, a meter) writes a string it already has.
 const N = 1024, caches: (string | undefined)[][] = [];
 /** The number a format compares: what the readout can actually show. */
-const key = (f: number, v: number) => (f === CLOCK ? Math.max(0, Math.floor(v)) : f === PCT ? Math.round(v * 100) : f < 0 ? v : Math.round(v));
+const key = (f: number, v: number) => (f === 1 /* CLOCK */ ? Math.max(0, Math.floor(v)) : f === 3 /* PCT */ ? Math.round(v * 100) : f < 0 ? v : Math.round(v));
 function str(f: number, k: number) {
-  if (f === CLOCK) return Math.floor(k / 60) + (k % 60 < 10 ? ":0" : ":") + (k % 60);
-  return f === RANK ? "#" + k : f === PCT ? k + "%" : "" + k;
+  if (f === 1 /* CLOCK */) return Math.floor(k / 60) + (k % 60 < 10 ? ":0" : ":") + (k % 60);
+  return f === 2 /* RANK */ ? "#" + k : f === 3 /* PCT */ ? k + "%" : "" + k;
 }
 const cached = (f: number, k: number) => (k >= 0 && k < N && k === (k | 0) ? ((caches[f] ??= new Array(N))[k] ??= str(f, k)) : str(f, k));
 
@@ -54,7 +53,7 @@ interface Bind {
   lines: string[];
   dirty: boolean;
 }
-const NUM = 0, METER = 1, FLAG = 2, FEED = 3, BANNER = 4;
+// Binding kinds, literals named in a comment (src/kernel/engine.ts says why): 0 NUM, 1 METER, 2 FLAG, 3 FEED, 4 BANNER.
 
 /** Change-only HUD bindings on `engine`, finding readouts in `root` (default `document`): `num`,
  *  `meter`, `flag`, `feed` and `banner`. Values are read every render and written only when what
@@ -76,8 +75,8 @@ export function hud(engine: Engine, root: ParentNode = document) {
   };
   const bind = (k: number, t: Target, g: Get | null, f: number, fn: Bind["fn"], c: string, n: number, line: Bind["line"], text: Bind["text"], play: Bind["play"]) => {
     const fnGet = typeof g === "function", x = el(t);
-    const b: Bind = { k, el: x, g: fnGet ? g : null, a: g && !fnGet ? g[0] : null, i: g && !fnGet ? g[1] : 0, f, fn, c, n, line, text, play, p: x, t: [], lines: Array<string>(k === FEED ? n : 2).fill(""), dirty: false };
-    if (k < FEED) {
+    const b: Bind = { k, el: x, g: fnGet ? g : null, a: g && !fnGet ? g[0] : null, i: g && !fnGet ? g[1] : 0, f, fn, c, n, line, text, play, p: x, t: [], lines: Array<string>(k === 3 /* FEED */ ? n : 2).fill(""), dirty: false };
+    if (k < 3 /* FEED */) {
       if (vals.length === last.length) {
         const o = last;
         (last = new Float64Array(o.length * 2).fill(NaN)).set(o);
@@ -91,14 +90,14 @@ export function hud(engine: Engine, root: ParentNode = document) {
   const system: System = {
     render() {
       for (let i = 0; i < vals.length; i++) {
-        const b = vals[i]!, v = b.g ? +b.g() : b.a![b.i]!, k = b.k === NUM ? key(b.fn ? -1 : b.f, v) : b.k === METER ? key(PCT, v < 0 ? 0 : v > 1 ? 1 : v) : v ? 1 : 0;
+        const b = vals[i]!, v = b.g ? +b.g() : b.a![b.i]!, k = b.k === 0 /* NUM */ ? key(b.fn ? -1 : b.f, v) : b.k === 1 /* METER */ ? key(3 /* PCT */, v < 0 ? 0 : v > 1 ? 1 : v) : v ? 1 : 0;
         if (k === last[i] || (k !== k && last[i] !== last[i])) continue;
         last[i] = k;
-        if (b.k === NUM) L.text((b.t[0] ??= textOf(b.el)), b.fn ? b.fn(k) : cached(b.f, k));
-        else if (b.k === FLAG) L.cls(b.el, b.c, k === 1);
+        if (b.k === 0 /* NUM */) L.text((b.t[0] ??= textOf(b.el)), b.fn ? b.fn(k) : cached(b.f, k));
+        else if (b.k === 2 /* FLAG */) L.cls(b.el, b.c, k === 1);
         else {
-          L.style(b.el, "width", cached(PCT, k));
-          if (b.el.getAttribute("role") === "progressbar") L.attr(b.el, "aria-valuenow", cached(INT, k));
+          L.style(b.el, "width", cached(3 /* PCT */, k));
+          if (b.el.getAttribute("role") === "progressbar") L.attr(b.el, "aria-valuenow", cached(0 /* INT */, k));
           if (b.n >= 0) L.cls(b.el, "low", k <= b.n);
         }
       }
@@ -110,7 +109,7 @@ export function hud(engine: Engine, root: ParentNode = document) {
             const b = evs[i]!;
             if (x.type !== b.c) continue;
             b.dirty = true;
-            if (b.k === FEED) {
+            if (b.k === 3 /* FEED */) {
               for (let r = b.n - 1; r > 0; r--) b.lines[r] = b.lines[r - 1]!;
               b.lines[0] = b.line!(x.a, x.b);
             } else {
@@ -127,7 +126,7 @@ export function hud(engine: Engine, root: ParentNode = document) {
         // Rows and text nodes are found once, on the first event: an event frame reads no DOM.
         if (!b.t.length) {
           const kids = b.el.children;
-          if (b.k === FEED)
+          if (b.k === 3 /* FEED */)
             for (let r = 0; r < b.n; r++) {
               const row = kids[r] ?? b.el.appendChild(L.add(b.el.ownerDocument.createElement(/^[OU]L$/.test(b.el.tagName) ? "li" : "div")));
               if (!r) b.p = row as HTMLElement;
@@ -136,7 +135,7 @@ export function hud(engine: Engine, root: ParentNode = document) {
           // Title in the first child element (or the banner itself), sub in the second.
           else b.t.push(textOf(kids[0] ?? b.el)), kids[1] && b.t.push(textOf(kids[1]));
         }
-        if (b.k === FEED) for (let r = 0; r < b.n; r++) L.text(b.t[r]!, b.lines[r]!);
+        if (b.k === 3 /* FEED */) for (let r = 0; r < b.n; r++) L.text(b.t[r]!, b.lines[r]!);
         else {
           L.text(b.t[0]!, b.lines[0]!);
           if (b.t[1]) L.text(b.t[1], b.lines[1]!);
@@ -150,17 +149,17 @@ export function hud(engine: Engine, root: ParentNode = document) {
   const api = {
     /** A number readout: written only when its shown value changes. */
     num: (t: Target, get: Src, fmt: Fmt = "int") =>
-      typeof fmt === "function" ? bind(NUM, t, get, -1, fmt, "", 0, null, null, null) : bind(NUM, t, get, FMTS.indexOf(fmt), null, "", 0, null, null, null),
+      typeof fmt === "function" ? bind(0 /* NUM */, t, get, -1, fmt, "", 0, null, null, null) : bind(0 /* NUM */, t, get, FMTS.indexOf(fmt), null, "", 0, null, null, null),
     /** A bar: `width` in whole percent (0..1 in), `aria-valuenow` on a progressbar, class `low` at or under `low`. */
-    meter: (t: Target, get: Src, low?: number) => bind(METER, t, get, 0, null, "", low === undefined ? -1 : Math.round(low * 100), null, null, null),
+    meter: (t: Target, get: Src, low?: number) => bind(1 /* METER */, t, get, 0, null, "", low === undefined ? -1 : Math.round(low * 100), null, null, null),
     /** A class that follows a condition. */
-    flag: (t: Target, cls: string, get: () => boolean) => bind(FLAG, t, get, 0, null, cls, 0, null, null, null),
+    flag: (t: Target, cls: string, get: () => boolean) => bind(2 /* FLAG */, t, get, 0, null, cls, 0, null, null, null),
     /** A list of the last `rows` events of a type, newest first (`play` runs on the newest row). */
     feed: (list: Target, rows: number, on: string, line: (a: number, b: number) => string, play?: (row: HTMLElement) => void) =>
-      bind(FEED, list, null, 0, null, on, rows, line, null, play ?? null),
+      bind(3 /* FEED */, list, null, 0, null, on, rows, line, null, play ?? null),
     /** Title and sub from an event; `play` (re)starts the game's own animation. */
     banner: (t: Target, on: string, text: (a: number, b: number) => readonly [string, string?], play?: (el: HTMLElement) => void) =>
-      bind(BANNER, t, null, 0, null, on, 0, null, text, play ?? null),
+      bind(4 /* BANNER */, t, null, 0, null, on, 0, null, text, play ?? null),
     /** The render system (already added to the engine; `engine.remove(system)` unbinds everything). */
     system,
   };

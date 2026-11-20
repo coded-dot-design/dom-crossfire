@@ -132,6 +132,13 @@
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
 }
+/* Decoration never takes a touch: an icon in a key or the pad passes the press to its key (an
+   unsized SVG in WebKit is 300 x 150 and would swallow the thumb). */
+.bui button svg,
+.bui .bui-key svg,
+.bui .bui-pad svg {
+  pointer-events: none;
+}
 .bui button svg,
 .bui .bui-key svg {
   width: calc(18 * var(--u));
@@ -520,11 +527,9 @@
   contain: layout style; /* rule 8: already positioned and stacked, so nothing moves or clips */
   background: color-mix(in srgb, #2a2d38 82%, transparent);
 }
-.bui .bui-overlay[hidden] {
-  display: none;
-}
-/* @fzlt/core/coach's card lays itself out inline (display: grid), which beats the browser's [hidden]. */
-.bui .fizlet-coach[hidden] {
+/* [hidden] wins kit-wide: a component's own display (an overlay's flex, coach's inline grid, a game's
+   panel) would beat the browser's [hidden] and leave a hidden part on screen. */
+.bui [hidden] {
   display: none !important;
 }
 .bui .bui-sticker {

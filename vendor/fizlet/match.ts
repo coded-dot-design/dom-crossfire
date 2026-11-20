@@ -6,7 +6,7 @@
  * HUD, sound and coach layers react without knowing about this one. Pass `null` as the root to run
  * the phase machine headless (tests, a server).
  */
-import { READ, STEP, type Engine, type System } from "./kernel/engine";
+import { type Engine, type System } from "./kernel/engine";
 
 /** Where a match is: the intro, the countdown, play, paused or the end. */
 export type Phase = "intro" | "count" | "play" | "paused" | "end";
@@ -65,7 +65,7 @@ const EV = [...PH.slice(0, 4), "won", "lost", "flag"].map((t) => "match:" + t);
 const KEYS: MatchKey[] = ["start", "resume", "surrender", "again", "next"];
 /** Which keys each phase shows (bit i = KEYS[i]): the primary key comes first. */
 const MASK = [1, 0, 0, 6, 24];
-const INTRO = 0, COUNT = 1, PLAY = 2, PAUSED = 3, END = 4;
+// Phases, literals named in a comment (src/kernel/engine.ts says why): 0 INTRO, 1 COUNT, 2 PLAY, 3 PAUSED, 4 END; frame phases 1 READ, 2 STEP.
 const EDIT = "input,textarea,select,[contenteditable],[data-fizlet-ignore]";
 const WORDS: MatchLabels = {
   intro: ["PLAYER 1", "READY?"], count: "GET READY", paused: ["BATTLE PAUSED", "GIVE UP?"],
@@ -85,10 +85,10 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
   n[0] = total;
   // Events raised outside a frame wait here and go out in the next read (the ring is per frame).
   const q = new Uint8Array(8), qa = new Float64Array(8);
-  let phase = INTRO, painted = -1, qn = 0, dirty = 0, won = false, going = false, why = "";
+  let phase = 0 /* INTRO */, painted = -1, qn = 0, dirty = 0, won = false, going = false, why = "";
   let prev: HTMLElement | null = null, flagT: ReturnType<typeof setTimeout> | undefined;
   const inert: HTMLElement[] = [];
-  const inFrame = () => e.phase === READ || e.phase === STEP;
+  const inFrame = () => e.phase === 1 /* READ */ || e.phase === 2 /* STEP */;
   const reduced = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   let ov: HTMLElement | null = null, kick: Text, word: Text, sticker: HTMLElement, keys: HTMLElement[] = [];
@@ -132,13 +132,13 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
     e.signal.addEventListener("abort", () => clearTimeout(flagT), { once: true });
     addEventListener("keydown", (ev) => {
       if (!codes.includes(ev.code) || ev.metaKey || ev.ctrlKey || ev.altKey || (ev.composedPath()[0] as Element).closest?.(EDIT)) return;
-      if ((phase === PLAY || phase === PAUSED) && !going) {
+      if ((phase === 2 /* PLAY */ || phase === 3 /* PAUSED */) && !going) {
         ev.preventDefault();
         if (!ev.repeat) m.pause();
       }
     }, on);
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") phase === PLAY && hold(true, 1);
+      if (document.visibilityState === "hidden") phase === 2 /* PLAY */ && hold(true, 1);
       else if (!ov!.hidden) slam();
     }, on);
   }
@@ -156,24 +156,24 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
     // A destroyed engine's match is inert: a late call can't write past Recall.
     if (e.signal.aborted) return;
     phase = p;
-    emit(p === END ? (won ? 4 : 5) : p, a);
+    emit(p === 4 /* END */ ? (won ? 4 : 5) : p, a);
     // DOM writes never happen in a step: a transition there is painted in this frame's render.
     if (inFrame()) dirty = 1;
     else paint();
   }
   function hold(on: boolean, a = 0) {
-    if (on && phase === PLAY) (go(PAUSED, a), e.stop());
-    else if (!on && phase === PAUSED && !going) (e.start(), go(PLAY, 1));
+    if (on && phase === 2 /* PLAY */) (go(3 /* PAUSED */, a), e.stop());
+    else if (!on && phase === 3 /* PAUSED */ && !going) (e.start(), go(2 /* PLAY */, 1));
   }
 
   function paint() {
     dirty = 0;
     const p = phase, was = painted, fresh = p !== was;
-    let w: Sticker = p === COUNT ? [lab.count, "" + n[2]] : p === END ? (won ? lab.won : why === "flag" ? lab.flag : lab.lost) : p === PLAY ? lab.paused : (lab[PH[p] as "intro"]);
+    let w: Sticker = p === 1 /* COUNT */ ? [lab.count, "" + n[2]] : p === 4 /* END */ ? (won ? lab.won : why === "flag" ? lab.flag : lab.lost) : p === 2 /* PLAY */ ? lab.paused : (lab[PH[p] as "intro"]);
     painted = p;
-    if (fresh && p === END) w = o.end?.({ won, why, clock: n[0]! }) || w;
+    if (fresh && p === 4 /* END */) w = o.end?.({ won, why, clock: n[0]! }) || w;
     if (ov) {
-      const show = p !== PLAY && !o.hide?.includes(PH[p]!), doc = ov.getRootNode() as Document, act = doc.activeElement as HTMLElement | null;
+      const show = p !== 2 /* PLAY */ && !o.hide?.includes(PH[p]!), doc = ov.getRootNode() as Document, act = doc.activeElement as HTMLElement | null;
       L.attr(ov, "hidden", show ? null : "");
       L.attr(ov, "data-phase", PH[p]!);
       keys.forEach((k, i) => (L.style(k, "display", (MASK[p]! >> i) & 1 ? "" : "none"), L.cls(k, "go", false)));
@@ -208,12 +208,12 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
     },
     step(_, dt) {
       // The countdown and the clock are motion: a settling engine stays awake for them.
-      if (phase === COUNT || phase === PLAY) e.busy();
-      if (phase === COUNT) {
+      if (phase === 1 /* COUNT */ || phase === 2 /* PLAY */) e.busy();
+      if (phase === 1 /* COUNT */) {
         const c = Math.ceil((n[1]! -= dt) - 1e-9);
-        if (c <= 0) go(PLAY);
-        else if (c !== n[2]) (n[2] = c), emit(COUNT, c), (dirty = 1);
-      } else if (phase === PLAY) {
+        if (c <= 0) go(2 /* PLAY */);
+        else if (c !== n[2]) (n[2] = c), emit(1 /* COUNT */, c), (dirty = 1);
+      } else if (phase === 2 /* PLAY */) {
         if (!total) n[0]! += dt;
         else if ((n[0]! -= dt) <= 0) (n[0] = 0), m.finish(o.timeUp?.() ?? false, "time");
       }
@@ -236,20 +236,20 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
     el: ov,
     /** PRESS START: from the intro (or the result), begin a round. */
     start() {
-      if (phase === INTRO || phase === END) m.restart();
+      if (phase === 0 /* INTRO */ || phase === 4 /* END */) m.restart();
     },
     /** Pause (true), resume (false) or toggle (no argument). Only during play. */
     pause(on?: boolean) {
-      hold(on ?? phase === PLAY);
+      hold(on ?? phase === 2 /* PLAY */);
     },
     /** End the match now (a win, a loss, "flag" for surrender). */
     finish(w: boolean, y = "game") {
-      if (phase === INTRO || phase === END) return;
+      if (phase === 0 /* INTRO */ || phase === 4 /* END */) return;
       won = w;
       why = y;
       going = false;
       e.start();
-      go(END, n[0]);
+      go(4 /* END */, n[0]);
     },
     /** A new round from any phase: begin(), the clock reset, then the countdown. */
     restart() {
@@ -258,13 +258,13 @@ export function match(e: Engine, root: HTMLElement | null, o: MatchOptions = {})
       going = false;
       o.begin?.();
       e.start();
-      beats > 0 ? go(COUNT, beats) : go(PLAY);
+      beats > 0 ? go(1 /* COUNT */, beats) : go(2 /* PLAY */);
     },
     /** Back to the start screen (NEW GAME). */
     intro() {
       going = false;
       e.start();
-      go(INTRO);
+      go(0 /* INTRO */);
     },
     system,
   };

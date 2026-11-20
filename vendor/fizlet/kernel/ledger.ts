@@ -11,8 +11,8 @@ interface Rec<V> {
   o: V;
   /** The engine's last write. */
   l: V;
-  /** The host changed it after us: hands off for good. */
-  x: boolean;
+  /** The host changed it after us, or the ledger was closed when it was made: hands off for good. */
+  x?: boolean | undefined;
 }
 interface StyleRec extends Rec<string> {
   op: string;
@@ -22,10 +22,12 @@ interface Entry {
   style?: Map<string, StyleRec>;
   attr?: Map<string, Rec<string | null>>;
   cls?: Map<string, Rec<boolean>>;
-  hadStyle: boolean;
+  /** Had a style attribute before our first write. */
+  hs: boolean;
   /** The style attribute text before our first write (restored verbatim when we still own it all). */
   os: string | null;
-  hadClass: boolean;
+  /** Had a class attribute before our first write. */
+  hc: boolean;
 }
 
 let probe: HTMLElement | undefined;
@@ -46,17 +48,20 @@ export class Ledger {
   private readonly t = new Map<CharacterData, Rec<string | null>>();
   private readonly m = new Map<El, Entry>();
   private readonly a: Node[] = [];
+  // z: closed by `restore(true)` (engine.destroy): a record made from then on starts hands-off, so
+  // every write is refused and touches nothing; Recall stays exact after a late callback's write.
+  declare private z?: boolean | undefined;
 
   private e(el: El) {
     let e = this.m.get(el);
-    if (!e) this.m.set(el, (e = { hadStyle: el.hasAttribute("style"), os: el.getAttribute("style"), hadClass: el.hasAttribute("class") }));
+    if (!e) this.m.set(el, (e = { hs: el.hasAttribute("style"), os: el.getAttribute("style"), hc: el.hasAttribute("class") }));
     return e;
   }
 
   /** Replace a text node's value. False if the host changed it since our last write. */
   text(node: CharacterData, value: string): boolean {
     let r = this.t.get(node);
-    if (!r) this.t.set(node, (r = { o: node.nodeValue, l: node.nodeValue, x: false }));
+    if (!r) this.t.set(node, (r = { o: node.nodeValue, l: node.nodeValue, x: this.z }));
     if (r.x || node.nodeValue !== r.l) return !(r.x = true);
     if (r.l !== value) node.nodeValue = r.l = value;
     return true;
@@ -68,7 +73,7 @@ export class Ledger {
     let r = map.get(prop);
     if (!r) {
       const v = s.getPropertyValue(prop), p = s.getPropertyPriority(prop);
-      map.set(prop, (r = { o: v, l: v, op: p, lp: p, x: false }));
+      map.set(prop, (r = { o: v, l: v, op: p, lp: p, x: this.z }));
     }
     if (lost(r, s, prop)) return !(r.x = true);
     if (r.l === value && r.lp === priority) return true;
@@ -95,7 +100,7 @@ export class Ledger {
     let r = map.get(name);
     if (!r) {
       const v = el.getAttribute(name);
-      map.set(name, (r = { o: v, l: v, x: false }));
+      map.set(name, (r = { o: v, l: v, x: this.z }));
     }
     if (r.x || el.getAttribute(name) !== r.l) return !(r.x = true);
     if (r.l === value) return true;
@@ -111,21 +116,26 @@ export class Ledger {
     let r = map.get(name);
     if (!r) {
       const v = el.classList.contains(name);
-      map.set(name, (r = { o: v, l: v, x: false }));
+      map.set(name, (r = { o: v, l: v, x: this.z }));
     }
     if (r.x || el.classList.contains(name) !== r.l) return !(r.x = true);
     if (r.l !== on) el.classList.toggle(name, (r.l = on));
     return true;
   }
 
-  /** A node the engine put on the page (canvas, overlay, debris): removed on restore. */
+  /** A node the engine put on the page (canvas, overlay, debris): removed on restore. Once closed
+   *  (after engine.destroy()) it is removed as soon as the caller's task ends: the caller inserts it
+   *  after this returns, so it can't be refused here. */
   add<N extends Node>(node: N): N {
-    this.a.push(node);
+    this.z ? queueMicrotask(() => (node as unknown as ChildNode).remove?.()) : this.a.push(node);
     return node;
   }
 
-  /** Recall: put back everything we still own, newest first. Host edits win. */
-  restore() {
+  /** Recall: put back everything we still own, newest first. Host edits win. With `close` (what
+   *  `engine.destroy()` passes) every later text, style, attr or cls write is refused (returns false,
+   *  touches nothing), so nothing written after Recall outlives it; without it the ledger is reused. */
+  restore(close?: boolean) {
+    this.z ||= close;
     for (let i = this.a.length; i--; ) (this.a[i] as ChildNode).remove?.();
     for (const [node, r] of this.t) if (!r.x && node.nodeValue === r.l) node.nodeValue = r.o;
     for (const [el, e] of this.m) {
@@ -139,8 +149,8 @@ export class Ledger {
       });
       // Still ours end to end: put the original attribute text back byte for byte.
       if (e.style && all && e.os !== null && el.style.cssText === withStyle(e.os, el)) el.setAttribute("style", e.os);
-      if (e.style && !e.hadStyle && !el.getAttribute("style")) el.removeAttribute("style");
-      if (e.cls && !e.hadClass && el.getAttribute("class") === "") el.removeAttribute("class");
+      if (e.style && !e.hs && !el.getAttribute("style")) el.removeAttribute("style");
+      if (e.cls && !e.hc && el.getAttribute("class") === "") el.removeAttribute("class");
     }
     this.a.length = 0;
     this.t.clear();

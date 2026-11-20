@@ -15,14 +15,14 @@ export class EventRing {
   readonly cap: number;
   size = 0;
   dropped = 0;
-  private readonly slots: FizEvent[] = [];
+  private readonly s: FizEvent[] = []; // short: esbuild keeps property names
   constructor(cap = 64) {
     this.cap = need(cap, "events capacity", 2);
-    for (let i = 0; i < cap; i++) this.slots.push({ type: "", a: 0, b: 0, x: 0, y: 0, v: 0 });
+    for (let i = 0; i < cap; i++) this.s.push({ type: "", a: 0, b: 0, x: 0, y: 0, v: 0 });
   }
   emit(type: string, a = 0, b = 0, x = 0, y = 0, v = 0): boolean {
     if (this.size === this.cap) return (this.dropped++, false);
-    const s = this.slots[this.size++]!;
+    const s = this.s[this.size++]!;
     s.type = type;
     s.a = a;
     s.b = b;
@@ -32,7 +32,7 @@ export class EventRing {
     return true;
   }
   at(i: number): FizEvent | undefined {
-    return i < this.size ? this.slots[i] : undefined;
+    return i < this.size ? this.s[i] : undefined;
   }
   clear() {
     this.size = 0;

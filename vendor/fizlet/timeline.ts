@@ -74,8 +74,9 @@ interface Track {
   /** Start and duration in seconds. */
   t: number;
   d: number;
-  /** The easing's table. */
+  /** The easing's table; n: its step count when it is steps(n) (else 0), read without the table. */
   e: Float64Array;
+  n: number;
   /** Keyframes × numbers, flat; m keyframes. */
   v: Float64Array;
   m: number;
@@ -129,8 +130,9 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
     for (let i = 0; i < tracks.length; i++) {
       const k = tracks[i]!, p = k.p, out = p.o, w = out.length;
       if (u < k.t && !k.f) continue;
-      const x = (k.d > 0 ? Math.min(1, Math.max(0, (u - k.t) / k.d)) : +(u >= k.t)) * 256, c = k.e, h = Math.min(255, Math.floor(x));
-      const e = (c[h]! + (c[h + 1]! - c[h]!) * (x - h)) * (k.m - 1);
+      const P = k.d > 0 ? Math.min(1, Math.max(0, (u - k.t) / k.d)) : +(u >= k.t), x = P * 256, c = k.e, h = Math.min(255, Math.floor(x)), n = k.n;
+      // Steps are whole: blending two table samples across a step's edge lands between steps.
+      const e = (n ? Math.min(1, Math.floor(P * n) / n) : c[h]! + (c[h + 1]! - c[h]!) * (x - h)) * (k.m - 1);
       const j = Math.min(Math.max(Math.floor(e), 0), k.m - 2), f = e - j;
       for (let q = 0; q < w; q++) {
         const a = k.v[j * w + q]!, v = Math.round((a + (k.v[j * w + w + q]! - a) * f) * 1e3) / 1e3;
@@ -175,7 +177,7 @@ export function timeline(engine: Engine, o: TimelineOptions = {}) {
           });
           // A single value starts where the property's last track ended.
           if (!v[1]) v.unshift(last ? [...last.v.subarray(last.v.length - w)] : v[0]!);
-          tracks.push({ p, t: t0 + i * st, d: dur, e: ease, v: new Float64Array(v.flat().map(Number)), m: v.length, f: first });
+          tracks.push({ p, t: t0 + i * st, d: dur, e: ease, n: +n || 0, v: new Float64Array(v.flat().map(Number)), m: v.length, f: first });
         }
       });
       prev = t0;

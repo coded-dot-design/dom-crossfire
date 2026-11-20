@@ -35,7 +35,7 @@ export interface SoundOptions {
   /** Master volume 0..1 (default 0.12). */
   volume?: number;
   /** Your own player instead of the synth. */
-  play?: (cue: Cue, intensity: number) => void;
+  play?: (cue: CueName, intensity: number) => void;
 }
 
 /** The sound adapter for engine `e`: after each frame it plays the cue mapped to each event in the
@@ -62,16 +62,19 @@ export function sound(e: Engine, o: SoundOptions) {
   // pointerup: on touch, Chrome grants the gesture on release, not on pointerdown.
   if (!o.play) for (const t of ["pointerdown", "pointerup", "keydown"]) addEventListener(t, unlock, { signal: ctl.signal, capture: true });
 
-  function play(cue: CueName, intensity = 1) {
+  /** Play `cue` now, or at `at` seconds on the audio clock (see `time`): a loop schedules ahead. */
+  function play(cue: CueName, intensity = 1, at?: number) {
     // Known cues only, by own key: an event type or cue such as "constructor" would otherwise
     // find Object.prototype's (a function, not notes) and throw in render, stopping the game.
     const notes = o.notes && Object.hasOwn(o.notes, cue) ? o.notes[cue] : Object.hasOwn(NOTES, cue) ? NOTES[cue as Cue] : null;
     if (!on || !e.running || ctl.signal.aborted || !notes) return;
-    if (o.play) return o.play(cue as Cue, intensity);
+    if (o.play) return o.play(cue, intensity);
     if (!ctx || !master || ctx.state !== "running") return;
-    const now = ctx.currentTime;
-    if (now - (last.get(cue) ?? -1) < (cue === "fire" ? 0.07 : 0.12)) return;
-    last.set(cue, now);
+    const now = at ?? ctx.currentTime;
+    if (!at) {
+      if (now - (last.get(cue) ?? -1) < (cue === "fire" ? 0.07 : 0.12)) return;
+      last.set(cue, now);
+    }
     for (const [from, to, sec, delay, wave, vol] of notes) {
       if (voices >= 8) return;
       const osc = ctx.createOscillator(), g = ctx.createGain(), t0 = now + delay, t1 = t0 + sec;
@@ -112,6 +115,10 @@ export function sound(e: Engine, o: SoundOptions) {
     dispose,
     get on() {
       return on;
+    },
+    /** The audio clock in seconds (it stands still while suspended or muted), -1 before the first gesture. */
+    get time() {
+      return ctx ? ctx.currentTime : -1;
     },
     set on(v: boolean) {
       on = v;
