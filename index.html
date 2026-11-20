@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- DOM Crossfire, the landing page (crossfire.domvirus.com): Battlefield Blitz's landing, made for
+<!-- DOM Crossfire, the landing page (crossfire.fzlt.games): Battlefield Blitz's landing, made for
      Crossfire. The hero is a live co-op battle (the game's attract mode). The game and the styles are
      dist/ (npm run check builds it); dist/page.js wires the page. By Chris Cooley, built on Fizlet. -->
 <html lang="en" class="bui" data-theme="dark">
@@ -8,17 +8,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>DOM Crossfire · plane and tank, co-op against four armies</title>
 <meta name="description" content="DOM Crossfire: pick the plane or the tank, your AI partner takes the other, and the bad guys of four DOM VIRUS games come at you in waves. Bugs, invaders, tank squads and flies, then all four at once.">
-<link rel="canonical" href="https://crossfire.domvirus.com/">
+<link rel="canonical" href="https://crossfire.fzlt.games/">
 <meta name="theme-color" content="#07060f">
 <meta property="og:type" content="website">
 <meta property="og:title" content="DOM Crossfire · plane and tank, co-op against four armies">
 <meta property="og:description" content="Pick the plane or the tank; your AI partner takes the other. Four DOM VIRUS armies come at you in waves.">
-<meta property="og:url" content="https://crossfire.domvirus.com/">
-<meta property="og:image" content="https://crossfire.domvirus.com/shots/og.png">
+<meta property="og:url" content="https://crossfire.fzlt.games/">
+<meta property="og:image" content="https://crossfire.fzlt.games/shots/og.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="./dist/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="./dist/site.css">
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"DOM Crossfire","url":"https://crossfire.domvirus.com/","description":"A co-op browser game: pick the plane or the tank, an AI partner takes the other, and the bad guys of four DOM VIRUS games come at you in waves.","genre":["Shooter","Co-op"],"gamePlatform":"Web browser","playMode":"SinglePlayer","isAccessibleForFree":true,"license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"Chris Cooley","url":"https://coded.design/"},"isPartOf":{"@type":"CreativeWorkSeries","name":"DOM VIRUS","url":"https://domvirus.com/"}}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"VideoGame","name":"DOM Crossfire","url":"https://crossfire.fzlt.games/","description":"A co-op browser game: pick the plane or the tank, an AI partner takes the other, and the bad guys of four DOM VIRUS games come at you in waves.","genre":["Shooter","Co-op"],"gamePlatform":"Web browser","playMode":"SinglePlayer","isAccessibleForFree":true,"author":{"@type":"Person","name":"Chris Cooley","url":"https://coded.design/"},"isPartOf":{"@type":"CreativeWorkSeries","name":"DOM VIRUS","url":"https://domvirus.com/"}}</script>
 <script>try{var t=localStorage.getItem("dom-virus:theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}</script>
 </head>
 <body data-page="home">
@@ -35,7 +35,7 @@
       <a href="https://domvirus.com/">DOM VIRUS ↗</a>
     </nav>
     <div class="head-keys">
-      <a class="bui-key bui-icon-key gh" href="https://github.com/coded-dot-design/dom-crossfire" aria-label="Source on GitHub"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 17c-4 1.2-4-2-5.5-2.5m11 4.5v-3a2.6 2.6 0 0 0-.7-2c2.4-.3 4.9-1.2 4.9-5.3a4.1 4.1 0 0 0-1.1-2.8 3.8 3.8 0 0 0-.1-2.8s-.9-.3-2.9 1.1a10 10 0 0 0-5.2 0C5.9 2.8 5 3.1 5 3.1a3.8 3.8 0 0 0-.1 2.8 4.1 4.1 0 0 0-1.1 2.8c0 4.1 2.5 5 4.9 5.3a2.6 2.6 0 0 0-.7 2v3"/></svg></a>
+      <a class="bui-key bui-icon-key gh" href="https://github.com/fizlet/battlefield-crossfire" aria-label="Source on GitHub"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7.5 17c-4 1.2-4-2-5.5-2.5m11 4.5v-3a2.6 2.6 0 0 0-.7-2c2.4-.3 4.9-1.2 4.9-5.3a4.1 4.1 0 0 0-1.1-2.8 3.8 3.8 0 0 0-.1-2.8s-.9-.3-2.9 1.1a10 10 0 0 0-5.2 0C5.9 2.8 5 3.1 5 3.1a3.8 3.8 0 0 0-.1 2.8 4.1 4.1 0 0 0-1.1 2.8c0 4.1 2.5 5 4.9 5.3a2.6 2.6 0 0 0-.7 2v3"/></svg></a>
       <button class="bui-key bui-icon-key" type="button" data-theme-toggle aria-label="Switch light or dark"><span class="theme-dark"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M15.5 12.5A6.5 6.5 0 0 1 7.5 4.5a6.5 6.5 0 1 0 8 8Z"/></svg></span><span class="theme-light"><svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M10 6.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM10 1.5v2M10 16.5v2M1.5 10h2M16.5 10h2M4 4l1.4 1.4M14.6 14.6 16 16M4 16l1.4-1.4M14.6 5.4 16 4"/></svg></span></button>
       <a class="bui-key bui-arcade bui-go play-key" href="./play/" data-launch-link><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 4 10 6-10 6Z"/></svg>Play</a>
     </div>
@@ -179,7 +179,7 @@
         <p class="eyebrow"><b>DROP-IN</b> · ANY WEBSITE</p>
         <h2>Put Crossfire on your page.</h2>
         <p>One line. A <b>PLAY CROSSFIRE</b> key appears; press it and your page becomes the arena: shells knock your headings around, treads flatten them, and the waves keep coming. Escape gives the page back exactly as it was.</p>
-        <pre><code>&lt;script src="https://crossfire.domvirus.com/dist/dom-crossfire.js" defer&gt;&lt;/script&gt;</code></pre>
+        <pre><code>&lt;script src="https://crossfire.fzlt.games/dist/dom-crossfire.js" defer&gt;&lt;/script&gt;</code></pre>
         <p>Drive the tank instead with <code>data-ride="tank"</code>, or hide it as an easter egg with <code>data-easter-egg="true"</code> (the Konami code on desktop).</p>
         <button class="bui-key bui-arcade bui-attack" type="button" data-drop><svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 2 4 11h5l-1 7 7-9h-5Z"/></svg>Drop Crossfire on this page</button>
       </div>
@@ -188,10 +188,10 @@
         <a class="panel cf-version" href="https://domvirus.com/">
           <b>DOM VIRUS</b><span>The arcade. Every game that turns the page into the board, and where these four armies come from.</span><em>Visit the arcade ↗</em>
         </a>
-        <a class="panel cf-version" href="https://battlefieldblitz.domvirus.com/">
+        <a class="panel cf-version" href="https://battlefieldblitz.fzlt.games/">
           <b>Battlefield Blitz</b><span>Where the tank comes from: free-for-all tank chaos, parachutes, power-ups, airstrikes.</span><em>Play Blitz ↗</em>
         </a>
-        <p class="cf-built">Built on <a href="https://fizlet.com/">Fizlet</a>, the tiny engine behind the DOM VIRUS arcade. Game code: <a href="https://github.com/coded-dot-design/dom-crossfire">dom-crossfire</a>.</p>
+        <p class="cf-built">Built on <a href="https://fizlet.com/">Fizlet</a>, the tiny engine behind the DOM VIRUS arcade. Game code: <a href="https://github.com/fizlet/battlefield-crossfire">dom-crossfire</a>.</p>
       </div>
     </div>
   </section>
@@ -208,11 +208,11 @@
     <div class="foot-col"><h2 id="map-play"><span class="index">01</span>Play</h2><ul aria-labelledby="map-play"><li><a href="./play/">Play Crossfire</a></li><li><a href="./play/squad/">Squad play</a></li><li><a href="#drop">Put it on your site</a></li></ul></div>
     <div class="foot-col"><h2 id="map-game"><span class="index">02</span>The game</h2><ul aria-labelledby="map-game"><li><a href="#how">How it plays</a></li><li><a href="#armies">The four armies</a></li><li><a href="#rides">Plane or tank</a></li><li><a href="#controls">Controls</a></li></ul></div>
     <div class="foot-col"><h2 id="map-armies"><span class="index">03</span>Their games</h2><ul aria-labelledby="map-armies"><li><a href="https://domvirus.com/games/swarm-protocol/">Swarm Protocol<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://domvirus.com/games/null-invaders/">Null Invaders<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://domvirus.com/games/sherman-bytes/">Sherman Bytes<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://domvirus.com/games/byte-runner/">Byte Runner<span class="out" aria-hidden="true">↗</span></a></li></ul></div>
-    <div class="foot-col"><h2 id="map-family"><span class="index">04</span>Family</h2><ul aria-labelledby="map-family"><li><a href="https://domvirus.com/">DOM VIRUS<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://battlefieldblitz.domvirus.com/">Battlefield Blitz<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://battlefield.domvirus.com/">DOM Battlefield<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://fizlet.com/">Fizlet<span class="out" aria-hidden="true">↗</span></a></li></ul></div>
-    <div class="foot-col"><h2 id="map-about"><span class="index">05</span>About</h2><ul aria-labelledby="map-about"><li><a href="https://github.com/coded-dot-design/dom-crossfire/blob/main/CHANGELOG.md">Release notes<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/coded-dot-design/dom-crossfire">Source on GitHub<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/coded-dot-design/dom-crossfire/blob/main/CONTRIBUTING.md">Contributing<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/coded-dot-design/dom-crossfire/blob/main/LICENSE">MIT licence<span class="out" aria-hidden="true">↗</span></a></li></ul></div>
+    <div class="foot-col"><h2 id="map-family"><span class="index">04</span>Family</h2><ul aria-labelledby="map-family"><li><a href="https://domvirus.com/">DOM VIRUS<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://battlefieldblitz.fzlt.games/">Battlefield Blitz<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://battlefield.fzlt.games/">DOM Battlefield<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://fizlet.com/">Fizlet<span class="out" aria-hidden="true">↗</span></a></li></ul></div>
+    <div class="foot-col"><h2 id="map-about"><span class="index">05</span>About</h2><ul aria-labelledby="map-about"><li><a href="https://github.com/fizlet/battlefield-crossfire/blob/main/CHANGELOG.md">Release notes<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/fizlet/battlefield-crossfire">Source on GitHub<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/fizlet/battlefield-crossfire/blob/main/CONTRIBUTING.md">Contributing<span class="out" aria-hidden="true">↗</span></a></li><li><a href="https://github.com/fizlet/battlefield-crossfire/blob/main/LICENSE">Licence<span class="out" aria-hidden="true">↗</span></a></li></ul></div>
   </nav>
   <div class="foot-base">
-    <div class="wrap"><span>© 2026 coded.design · MIT</span><span class="foot-legal"><a href="https://domvirus.com/legal/privacy/">Privacy</a></span><span>Created by Chris Cooley</span></div>
+    <div class="wrap"><span>© 2026 Chris Cooley · All rights reserved</span><span class="foot-legal"><a href="https://domvirus.com/legal/privacy/">Privacy</a></span><span>Created by Chris Cooley</span></div>
   </div>
 </footer>
 <script type="module" src="./dist/page.js"></script>

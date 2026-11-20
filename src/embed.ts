@@ -1,6 +1,6 @@
 /**
  * DOM Crossfire, drop-in. One script tag turns any page into the arena:
- *   <script src="https://crossfire.domvirus.com/dist/dom-crossfire.js" defer></script>
+ *   <script src="https://crossfire.fzlt.games/dist/dom-crossfire.js" defer></script>
  * Options as data attributes on that tag:
  *   data-easter-egg="true"   stay hidden until the Konami code (desktop) or a hold-then-tap on any
  *                            [data-crossfire-trigger] element (phones). Default: a PLAY CROSSFIRE key.

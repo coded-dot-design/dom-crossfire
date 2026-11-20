@@ -1,10 +1,10 @@
 {
-  "name": "@coded-design/dom-crossfire",
+  "name": "battlefield-crossfire",
   "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "DOM Crossfire: pick the plane or the tank, your AI partner takes the other, and the bad guys of four DOM VIRUS games come at you in waves. Built on Battlefield Blitz and Fizlet, by Chris Cooley.",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "author": "Chris Cooley (https://coded.design/)",
   "scripts": {
     "sync": "node scripts/sync.mjs",

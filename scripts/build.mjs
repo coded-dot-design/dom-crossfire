@@ -16,7 +16,7 @@ mkdirSync("dist/art", { recursive: true });
 // The Board UI kit, minified and baked in for the game's shadow root.
 const kitSrc = readFileSync("vendor/fizlet/ui/board-ui.css", "utf8");
 const kit = (await transform(kitSrc, { loader: "css", minify: true })).code;
-const common = { define: { __KIT_CSS__: JSON.stringify(kit) }, bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning", banner: { js: `/* DOM Crossfire ${version} · MIT © Chris Cooley · built on Fizlet */` } };
+const common = { define: { __KIT_CSS__: JSON.stringify(kit) }, bundle: true, minify: true, target: "es2022", legalComments: "none", logLevel: "warning", banner: { js: `/* DOM Crossfire ${version} · © Chris Cooley, all rights reserved · built on Fizlet */` } };
 await build({ ...common, entryPoints: ["src/index.ts"], format: "esm", outfile: "dist/dom-crossfire.mjs" });
 await build({ ...common, entryPoints: ["src/embed.ts"], format: "iife", outfile: "dist/dom-crossfire.js" });
 // Squad play: the module plus @fzlt/core/presence and the room join; the solo builds never ship them.
