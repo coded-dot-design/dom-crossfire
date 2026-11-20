@@ -3,6 +3,7 @@
 //   /play/       the game and /play/squad/ (play/)
 //   /dist/       what the pages load (the game, the drop-in, the styles, the art, the shots)
 //   /shots/      the shots again (the OG image's address)
+//   /404.html    the not-found page the host serves for a missing path (404.html; noindex)
 // .github/workflows/cloudflare.yml builds it for each target. Two variables, both optional:
 //   SITE_URL (+ SITE_BASE)  where the site is served: the pages' own address (canonical, share tags,
 //                           JSON-LD, the drop-in snippet) follows it. Unset: the address in the pages.
@@ -11,11 +12,11 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statS
 import { join } from "node:path";
 
 const HOME = "https://crossfire.fzlt.games/";
-const out = "artifacts/pages";
+const out = process.env.SITE_OUT || "artifacts/pages"; // SITE_OUT: tests build elsewhere
 if (!existsSync("dist/dom-crossfire.js")) throw Error("Build the game first (npm run check).");
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-cpSync("index.html", join(out, "index.html"));
+for (const page of ["index.html", "404.html"]) cpSync(page, join(out, page));
 for (const dir of ["play", "dist"]) cpSync(dir, join(out, dir), { recursive: true });
 cpSync("dist/shots", join(out, "shots"), { recursive: true });
 
@@ -28,7 +29,7 @@ for (const page of pages) {
   let html = readFileSync(page, "utf8").replaceAll(HOME, home);
   if (staging) {
     if (!html.includes("</head>")) throw Error(`${page}: no </head>`);
-    html = html.replace("</head>", '<meta name="robots" content="noindex, nofollow">\n</head>');
+    html = html.replace(/<meta name="robots"[^>]*>\n?/, "").replace("</head>", '<meta name="robots" content="noindex, nofollow">\n</head>');
   }
   writeFileSync(page, html);
 }
