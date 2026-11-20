@@ -12,6 +12,7 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "size": "node scripts/size.mjs",
     "check": "npm run build && npm run size",
+    "site:build": "npm run check && node scripts/site.mjs",
     "test": "node --expose-gc --test --test-concurrency=1 tests/*.test.mjs",
     "test:settle": "node tests/settle.mjs",
     "test:browser": "node tests/browser.mjs && node tests/phone.mjs",
