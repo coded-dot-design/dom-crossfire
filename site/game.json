@@ -1,16 +1,17 @@
 {
   "id": "dom-crossfire",
   "author": "Chris Cooley",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "name": "DOM Crossfire",
-  "kind": "DOM CHANNEL SURF",
-  "tagline": "The virus scrambled the cartridges.",
-  "description": "DOM Crossfire: the virus scrambled the cartridges, a shooter where every 30 seconds the rules channel-surf between five arcade games on one board.",
+  "kind": "DOM CO OP",
+  "tagline": "Pick a ride.",
+  "description": "DOM Crossfire: a co-op shooter on Battlefield Blitz. Pick the plane or the tank; the other is your AI partner against the bad guys of four DOM VIRUS games, wave by wave, then all four at once.",
   "accent": "violet",
   "icon": "virus",
   "controls": [
-    "Arrows / WASD / touch stick — move",
-    "Space / hold the pointer — fire",
-    "P — pause · Esc — give the page back"
+    "WASD / arrows / touch stick — move",
+    "Mouse / click / Space — aim and fire",
+    "E special · F airstrike · Q auto · T lock",
+    "P / Esc — pause"
   ]
 }

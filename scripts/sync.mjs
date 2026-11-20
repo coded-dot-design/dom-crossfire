@@ -1,5 +1,5 @@
 // Snapshot the engine this game is built on (FIZLET_DIR, default the sibling checkout ../fizlet),
-// with provenance. Never edit vendor/ by hand: change coded-dot-design/fizlet, then run node scripts/sync.mjs.
+// with provenance. Never edit vendor/ by hand: change fizlet/fzlt, then run node scripts/sync.mjs.
 import { cpSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -14,8 +14,8 @@ const files = [];
 const walk = (d) => readdirSync(d).forEach((n) => (statSync(join(d, n)).isDirectory() ? walk(join(d, n)) : files.push(join(d, n))));
 walk("vendor/fizlet");
 writeFileSync("vendor/fizlet/ORIGIN.json", JSON.stringify({
-  note: "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
-  repository: "https://github.com/coded-dot-design/fizlet",
+  note: "Generated snapshot. Edit fizlet/fzlt, then run node scripts/sync.mjs.",
+  repository: "https://github.com/fizlet/fzlt",
   version: JSON.parse(readFileSync(join(FIZLET, "package.json"), "utf8")).version,
   commit: execFileSync("git", ["-C", FIZLET, "rev-parse", "HEAD"]).toString().trim(),
   files: files.sort().map((f) => ({ path: relative("vendor/fizlet", f), sha256: sha(f) })),

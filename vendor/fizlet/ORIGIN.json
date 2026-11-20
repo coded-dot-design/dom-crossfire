@@ -1,6 +1,6 @@
 {
-  "note": "Generated snapshot. Edit coded-dot-design/fizlet, then run node scripts/sync.mjs.",
-  "repository": "https://github.com/coded-dot-design/fizlet",
+  "note": "Generated snapshot. Edit fizlet/fzlt, then run node scripts/sync.mjs.",
+  "repository": "https://github.com/fizlet/fzlt",
   "version": "0.27.0",
   "commit": "d372e26bd2719ed595928c4373f044ee6c4b349e",
   "files": [

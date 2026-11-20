@@ -1,15 +1,15 @@
-# DOM Crossfire
+# Battlefield Crossfire (DOM Crossfire)
 
 **Pick a ride. Two rides, four armies.** Fly the plane or drive the tank; the other one fights
 beside you as your AI partner. The bad guys of four DOM VIRUS games come at you in waves, then all
 four at once.
 
-By [Chris Cooley](https://coded.design/) · built on [Battlefield Blitz](https://github.com/coded-dot-design/dom-battlefield-blitz)
-and [Fizlet](https://fizlet.com/) · MIT
+By [Chris Cooley](https://coded.design/) · built on [Battlefield Blitz](https://github.com/fizlet/battlefield-blitz)
+and [Fizlet](https://fizlet.com/) · all rights reserved (private repository `fizlet/battlefield-crossfire`; versions up to 0.4.0 were MIT)
 
-- **Play:** https://crossfire.domvirus.com/play/
-- **About:** https://crossfire.domvirus.com/
-- **Drop-in:** `<script src="https://crossfire.domvirus.com/dist/dom-crossfire.js" defer></script>`
+- **Play:** https://crossfire.fzlt.games/play/
+- **About:** https://crossfire.fzlt.games/
+- **Drop-in:** `<script src="https://crossfire.fzlt.games/dist/dom-crossfire.js" defer></script>`
 
 ## The game
 
@@ -54,7 +54,7 @@ three. A squad of two keeps the AI partner (it takes the ride the two have fewer
 play alone. Shared DROPS; no pause in a squad match.
 
 It is Battlefield Blitz's net play: every screen runs the same match from the room's seed in lockstep
-over [`@fzlt/core/presence`](https://github.com/coded-dot-design/fizlet), and only inputs travel
+over [`@fzlt/core/presence`](https://github.com/fizlet/fzlt), and only inputs travel
 (one 32-bit word per person per frame: drive, fire, special, airstrike, aim mode, the pointer, the
 ride). The arena is a fixed 1100 × 640, scaled to fit each screen. The room server speaks the
 `fizlet-rooms` protocol; the page uses the same room server URL as Blitz (`data-rooms` on the squad
@@ -72,7 +72,7 @@ createCrossfire(document.querySelector("#arena"), { seed, ride: "tank", net: { t
 
 ```html
 <!-- A PLAY CROSSFIRE key appears bottom right; your page is the arena -->
-<script src="https://crossfire.domvirus.com/dist/dom-crossfire.js" defer></script>
+<script src="https://crossfire.fzlt.games/dist/dom-crossfire.js" defer></script>
 <!-- Drive the tank (the plane is the default) -->
 <script src=".../dom-crossfire.js" data-ride="tank" defer></script>
 <!-- Hidden: the Konami code on desktop, hold-then-tap a [data-crossfire-trigger] element on phones -->
@@ -108,11 +108,11 @@ npm run play           # the site on localhost (index.html and play/)
 
 The site is static: `index.html` (the landing), `play/index.html` (the game page) and `dist/`
 (built in CI: the game, the drop-in, `site.css` from `site/site.css` on the Board UI kit, `page.js`
-from `site/page.js`, the pixel art from `src/art.ts`). The Pages workflow publishes them to
-crossfire.domvirus.com.
+from `site/page.js`, the pixel art from `src/art.ts`). Cloudflare Pages serves them on
+crossfire.fzlt.games (it serves the custom domain, so there is no `CNAME` file).
 
 `src/game.ts` is the game (Blitz's `game.ts` reshaped: the crew, the four armies, the waves);
 `src/art.ts` is the cast as pixel data. `vendor/fizlet` is a committed snapshot of Fizlet's source
 at the `@fzlt/core` 0.21.2 release (tag `v0.21.2`), with its provenance in `vendor/fizlet/ORIGIN.json`.
-Never edit it by hand: check out that tag of [coded-dot-design/fizlet](https://github.com/coded-dot-design/fizlet)
+Never edit it by hand: check out that tag of [fizlet/fzlt](https://github.com/fizlet/fzlt)
 next to this repo (or set `FIZLET_DIR`) and run `npm run sync`.
